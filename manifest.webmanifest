@@ -1,0 +1,16 @@
+{
+  "name": "Começo",
+  "short_name": "Começo",
+  "description": "Abre e já sabe o que fazer agora.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#FBF5EA",
+  "theme_color": "#FBF5EA",
+  "lang": "pt-BR",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
