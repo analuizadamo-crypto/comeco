@@ -409,7 +409,7 @@ function defaults(){
     settings:{ name:'', why:'Medicina. Saúde para quem mais precisa.', calUrl:'', block:50, brk:10, screenGoal:120,
       dayStart:'07:00', dayEnd:'22:00', theme:'auto', semName:'Fall 2026', semStart:'2026-08-24', semEnd:'2026-12-18',
       subjects: clone(DEFAULT_SUBJECTS) },
-    sessions:[], days:{}, timer:null, brk:null, cal:{at:0, events:[], err:''}, cx:{lec:{}, done:{}}, archive:[], lastSubj:'bch', lastBackup:0 };
+    sessions:[], days:{}, timer:null, brk:null, cal:{at:0, events:[], err:''}, cx:{lec:{}, done:{}, phyT:{}, phyL:{}}, archive:[], lastSubj:'bch', lastBackup:0 };
 }
 function load(){
   const d = defaults(); let s = null;
@@ -429,7 +429,7 @@ function normalize(s){
   if (!s.cal || !Array.isArray(s.cal.events)) s.cal = d.cal;
   if (!Array.isArray(s.archive)) s.archive = [];
   if (!s.cx || typeof s.cx !== 'object') s.cx = {lec:{}, done:{}};
-  s.cx.lec = s.cx.lec || {}; s.cx.done = s.cx.done || {};
+  s.cx.lec = s.cx.lec || {}; s.cx.done = s.cx.done || {}; s.cx.phyT = s.cx.phyT || {}; s.cx.phyL = s.cx.phyL || {};
   s.settings.subjects.forEach((x, i) => { if (!x.color) x.color = PALETTE[i % PALETTE.length]; else if (OLD_COLORS[x.color]) x.color = OLD_COLORS[x.color]; });
   return s;
 }
@@ -644,6 +644,20 @@ function noteNow(){
   if (un >= 2 && k <= '2026-12-07') push('lecs', `🧬 ${un} aulas do Exam 4 sem processar — uma de cada vez, começa pela mais antiga.`);
   return N[0] || null;
 }
+/* PHY: Exam 2 topics until the makeup ends, then lectures for the Final */
+const PHY_TOPICS = [['circ','Circular motion'],['grav','Gravity'],['rot','Rotation / torque'],['eq','Equilibrium / springs'],['mom','Momentum / collisions'],['en','Work / energy']];
+const PHY_LECS = ['2026-11-10','2026-11-12','2026-11-17','2026-11-19','2026-12-01'];
+const phyExamMode = () => Date.now() < atK('2026-11-12', '21:15');
+const nextPhyTopic = () => (PHY_TOPICS.find(([id]) => !S.cx.phyT[id]) || [])[1];
+function vPhy(){
+  const today = dk();
+  if (phyExamMode()) return `<div class="chips">${PHY_TOPICS.map(([id, t]) => { const on = !!S.cx.phyT[id];
+      return `<button class="chip ${on ? 'done' : ''}" data-a="phyT" data-v="${id}">${on ? '✓ ' : ''}${t}</button>`; }).join('')}</div>
+    <p class="muted small" style="margin:4px 0 0">Dominado = acertou um problema desse tipo <b>sozinha</b>.</p>`;
+  return `<div class="chips">${PHY_LECS.map(k => { const on = !!S.cx.phyL[k];
+      return `<button class="chip ${on ? 'done' : ''}" style="${k > today && !on ? 'opacity:.5' : ''}" data-a="phyL" data-v="${k}">${on ? '✓ ' : ''}${fmtDM(k)}</button>`; }).join('')}</div>
+    <p class="muted small" style="margin:4px 0 0">Processada = mandou pro Claude + fez 1 par guiado/sozinha.</p>`;
+}
 const fmtDM = k => { const d = parseYmd(k); return `${d.getDate()}/${d.getMonth() + 1}`; };
 function vClass(k, items){
   return items.map(i => { const dn = clDone(k, i.id);
@@ -668,7 +682,7 @@ function nextAction(){
     }
     if (today === '2026-11-09' && hr >= 18 && nowT < atK('2026-11-09', '23:59') && !S.cx.done['bch-q10'])
       return {subj:sid('bch'), title:'BCH Quiz 10', why:'Até 11:59 PM hoje · 25 min · Honorlock. Depois, volta pra física.', task:'BCH Quiz 10', dlId:'bch-q10'};
-    return {subj:sid('phy'), title:'Physics: problemas', why:`Exam 2 makeup ${countdown({s:mk, allDay:false})} · 1 guiado + 1 sozinha — problemas, não leitura.`};
+    return {subj:sid('phy'), title:'Physics: problemas', why:`Exam 2 makeup ${countdown({s:mk, allDay:false})} · ${nextPhyTopic() ? 'próximo tipo: ' + nextPhyTopic() + ' · ' : ''}1 guiado + 1 sozinha — problemas, não leitura.`};
   }
   // 1. pinned task
   const pinned = tasksOf(today).find(t => t.pinned && !t.done);
@@ -845,6 +859,9 @@ function vHome(){
   const ci = classItems(today);
   if (ci.length) html += fold('class', '📝 Hoje nas aulas', `${ci.filter(i => clDone(today, i.id)).length}/${ci.length}`, vClass(today, ci));
   if (today <= '2026-12-07') html += fold('lecs', '🧬 BCH Exam 4', `${BCH_LECS.filter(x => !S.cx.lec[x]).length} faltam`, vLecs());
+  if (today <= '2026-12-08') html += phyExamMode()
+    ? fold('phy', '🧲 PHY Exam 2', `${PHY_TOPICS.filter(([id]) => S.cx.phyT[id]).length}/6 dominados`, vPhy())
+    : fold('phy', '🧲 PHY Final', `${PHY_LECS.filter(x => !S.cx.phyL[x]).length} faltam`, vPhy());
   const dls = deadlines(14);
   html += fold('dl', '⏳ Próximos prazos', dls.length ? `${dls.length}` : '—', vDeadlines(dls));
   return html;
@@ -1342,6 +1359,10 @@ const A = {
     save(); render(); },
   lec: v => { if (S.cx.lec[v]) delete S.cx.lec[v]; else S.cx.lec[v] = true; save(); render();
     if (S.cx.lec[v]) toast(`Aula processada 🧬 · faltam ${BCH_LECS.filter(x => !S.cx.lec[x]).length}`); },
+  phyT: v => { if (S.cx.phyT[v]) delete S.cx.phyT[v]; else S.cx.phyT[v] = true; save(); render();
+    if (S.cx.phyT[v]) toast(`Dominado! 🧲 ${PHY_TOPICS.filter(([id]) => S.cx.phyT[id]).length}/6`); },
+  phyL: v => { if (S.cx.phyL[v]) delete S.cx.phyL[v]; else S.cx.phyL[v] = true; save(); render();
+    if (S.cx.phyL[v]) toast(`Aula processada 🧲 · faltam ${PHY_LECS.filter(x => !S.cx.phyL[x]).length}`); },
   dlDone: v => { S.cx.done[v] = true; save(); render(); toast('Feito! 🐞'); },
   noteX: v => { const d = day(dk()); d.dis = d.dis || {}; d.dis[v] = true; save(); render(); },
   anki: v => { const d = day(dk()); d.anki = v === '1'; d.cl = d.cl || {}; d.cl.anki = d.anki; save(); render(); if (d.anki) toast('Anki feito 🃏'); },
