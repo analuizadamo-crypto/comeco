@@ -538,7 +538,8 @@ async function fetchCal(manual){
     S.cal.err = (e && e.message && !/fetch|json|Load failed|network/i.test(e.message)) ? e.message : 'Sem conexão — usando o último salvo';
     save(); if (manual) toast(S.cal.err);
   }
-  calLoading = false; safeRender();
+  calLoading = false;
+  if (manual && ui.sheet === 'settings') render(); else safeRender();
 }
 
 /* busy/free logic for "right now" */
