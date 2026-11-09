@@ -497,6 +497,7 @@ function matchSubj(text){
 
 /* ==================== calendar ==================== */
 let calLoading = false;
+const calWarn = () => !!S.cal.err && (!/Sem conexão/.test(S.cal.err) || Date.now() - (S.cal.at || 0) > 36e5);
 function events(){
   return (S.cal.events||[]).map(e => {
     let s, en;
@@ -529,8 +530,11 @@ async function fetchCal(manual){
   if (calLoading) return;
   calLoading = true; if (manual) toast('Atualizando calendário…');
   try {
-    const r = await fetch(url, {redirect:'follow', cache:'no-store'});
-    const j = await r.json();
+    let j = null;
+    for (let i = 0; i < 2 && !j; i++) {   // Google sometimes hiccups: retry once
+      try { const r = await fetch(url, {redirect:'follow', cache:'no-store'}); j = await r.json(); }
+      catch (e) { if (i) throw e; await new Promise(res => setTimeout(res, 2500)); }
+    }
     if (!j || !j.ok) throw new Error(j && j.error === 'senha' ? 'Senha errada no link (?key=…)' : 'O script respondeu com erro');
     S.cal = {at: Date.now(), events: Array.isArray(j.events) ? j.events : [], err:''};
     save(); if (manual) toast('Calendário atualizado ✓');
@@ -896,7 +900,7 @@ function vTimeline(){
     return `<li class="${it.free?'free':''} ${past?'past':''} ${isNow?'cur':''}"><span class="t">${clock(it.s)}–${clock(it.e)}</span><span class="x">${label}${isNow?'<span class="tag">agora</span>':''}</span></li>`;
   }).join('') || '<li class="free"><span class="x">Dia livre 🌿</span></li>'}</ul>`;
   const ago = S.cal.at ? Math.round((Date.now() - S.cal.at)/6e4) : null;
-  html += `<div class="row small muted" style="margin-top:8px"><span>${S.cal.err ? '⚠️ ' + esc(S.cal.err) + ' · ' : ''}${ago == null ? 'ainda não sincronizado' : ago < 1 ? 'atualizado agora' : `atualizado há ${ago < 60 ? ago + ' min' : fmtMin(ago)}`}</span>
+  html += `<div class="row small muted" style="margin-top:8px"><span>${calWarn() ? '⚠️ ' + esc(S.cal.err) + ' · ' : ''}${ago == null ? 'ainda não sincronizado' : ago < 1 ? 'atualizado agora' : `atualizado há ${ago < 60 ? ago + ' min' : fmtMin(ago)}`}</span>
     <button class="link" style="margin-left:auto" data-a="refresh">↻ Atualizar</button></div>`;
   return html;
 }
@@ -1103,7 +1107,7 @@ function vSettings(){
   <h3>🗓️ Google Calendar</h3>
   <div class="field"><label>Link do Apps Script (termina em /exec?key=…)</label><input data-in="set:calUrl" value="${esc(st.calUrl)}" placeholder="https://script.google.com/macros/s/…/exec?key=…" autocapitalize="off" autocorrect="off" spellcheck="false"></div>
   <button class="btn ghost" data-a="refresh">↻ Conectar / atualizar</button>
-  <p class="muted small">${S.cal.at ? `Última sincronização: ${new Date(S.cal.at).toLocaleString('pt-BR')} · ${S.cal.events.length} eventos` : 'Ainda não conectado.'}${S.cal.err ? ' · ⚠️ ' + esc(S.cal.err) : ''}</p>
+  <p class="muted small">${S.cal.at ? `Última sincronização: ${new Date(S.cal.at).toLocaleString('pt-BR')} · ${S.cal.events.length} eventos` : 'Ainda não conectado.'}${calWarn() ? ' · ⚠️ ' + esc(S.cal.err) : ''}</p>
   <details class="help"><summary>Como conectar (resumo)</summary><ol><li>Abre script.google.com → Novo projeto → cola o arquivo <b>Code.gs</b>.</li><li>Troca a senha em <code>SECRET</code>.</li>
   <li>Implantar → Nova implantação → App da Web · Executar como: <b>eu</b> · Quem tem acesso: <b>Qualquer pessoa</b>.</li><li>Copia o link /exec, adiciona <code>?key=SUA_SENHA</code> no fim e cola aqui.</li></ol>O passo a passo completo está no LEIA-ME.</details>
   <p class="small">💡 Coloque <b>EXAM</b> ou <b>DUE</b> no título dos eventos (ex: “BCH EXAM 3”, “PHY HW DUE”). É assim que eu sei o que priorizar.</p>
