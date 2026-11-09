@@ -38,7 +38,7 @@ Arquivos desta pasta:
 
 1. No computador, abre **script.google.com** (logada na sua conta Google) → **Novo projeto**.
 2. Apaga o que estiver lá, e **cola todo o conteúdo do `Code.gs`**.
-3. Na linha `const SECRET = 'troque-esta-senha';`, troca por uma palavra sua (só letras e números), ex: `joaninha2026`.
+3. Na linha `const SECRET = 'troque-esta-senha';`, troca por uma palavra sua (só letras e números), ex: `SUA-SENHA`.
 4. Clica em 💾 **Salvar**. Dá um nome ao projeto: `Começo`.
 5. Engrenagem ⚙️ **Configurações do projeto** → confere o **Fuso horário** (ex: *America/New_York*).
 6. Lá em cima: **Implantar** → **Nova implantação**.
@@ -51,7 +51,7 @@ Arquivos desta pasta:
    *(É normal: o "app" é o seu próprio script, só você o criou.)*
 8. Copia a **URL do app da Web** (termina em `/exec`).
 9. No fim dela, adiciona `?key=` + sua senha. Exemplo:
-   `https://script.google.com/macros/s/AKfy.../exec?key=joaninha2026`
+   `https://script.google.com/macros/s/AKfy.../exec?key=SUA-SENHA`
 10. Manda esse link pra você mesma (e-mail/WhatsApp), abre o Começo no iPhone → ⚙️ **Ajustes** → cola em **Link do Apps Script** → **Conectar / atualizar**. ✓
 
 Pronto: o app lê **todos** os seus calendários dos próximos 14 dias, toda vez que abre (e no botão ↻). Eventos novos aparecem sozinhos. Sem internet, ele usa a última cópia salva.
