@@ -293,6 +293,13 @@ details.help summary{font-weight:600;cursor:pointer}
 details.help ol{padding-left:20px;margin:8px 0 0}
 
 /* toast + yay + bug */
+/* ringing timers */
+.ringov{position:fixed;inset:0;z-index:88;display:grid;place-items:center;background:rgba(18,10,6,.55);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);animation:fade .2s}
+.ringbox{background:var(--card);border:2px solid var(--amber);border-radius:28px;padding:26px 24px;text-align:center;width:min(88vw,360px);box-shadow:0 0 60px rgba(249,162,7,.45)}
+.ringbox .bell{font-size:3.4rem;display:inline-block;animation:shake .5s ease-in-out infinite}
+.ringbox h2{margin:6px 0}
+@keyframes shake{0%,100%{transform:rotate(0)}25%{transform:rotate(-14deg)}75%{transform:rotate(14deg)}}
+.altime{font-variant-numeric:tabular-nums;font-weight:700;margin-left:auto;white-space:nowrap}
 #toast{position:fixed;left:50%;bottom:calc(96px + env(safe-area-inset-bottom));transform:translateX(-50%) translateY(20px);z-index:90;
   background:var(--ink);color:var(--bg);padding:12px 18px;border-radius:16px;font-weight:600;font-size:.95rem;opacity:0;pointer-events:none;transition:.25s;max-width:88vw;text-align:center}
 #toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
@@ -328,6 +335,7 @@ details.help ol{padding-left:20px;margin:8px 0 0}
 <div id="overlay"></div>
 <div id="sheet"></div>
 <div id="yay"></div>
+<div id="ring"></div>
 <div id="toast" role="status" aria-live="polite"></div>
 
 <script>
@@ -406,10 +414,10 @@ const dayOfYear = () => { const n = new Date(); return Math.floor((n - new Date(
 /* ==================== state + storage ==================== */
 function defaults(){
   return { v:1,
-    settings:{ name:'', why:'Medicina. Saúde para quem mais precisa.', calUrl:'', block:50, brk:10, screenGoal:120,
+    settings:{ name:'', ring:true, why:'Medicina. Saúde para quem mais precisa.', calUrl:'', block:50, brk:10, screenGoal:120,
       dayStart:'07:00', dayEnd:'22:00', theme:'auto', semName:'Fall 2026', semStart:'2026-08-24', semEnd:'2026-12-18',
       subjects: clone(DEFAULT_SUBJECTS) },
-    sessions:[], days:{}, timer:null, brk:null, cal:{at:0, events:[], err:''}, cx:{lec:{}, done:{}, phyT:{}, phyL:{}}, archive:[], lastSubj:'bch', lastBackup:0 };
+    sessions:[], days:{}, timer:null, brk:null, alarms:[], cal:{at:0, events:[], err:''}, cx:{lec:{}, done:{}, phyT:{}, phyL:{}}, archive:[], lastSubj:'bch', lastBackup:0 };
 }
 function load(){
   const d = defaults(); let s = null;
@@ -428,6 +436,8 @@ function normalize(s){
   if (!s.days || typeof s.days !== 'object') s.days = {};
   if (!s.cal || !Array.isArray(s.cal.events)) s.cal = d.cal;
   if (!Array.isArray(s.archive)) s.archive = [];
+  if (!Array.isArray(s.alarms)) s.alarms = [];
+  if (s.settings.ring === undefined) s.settings.ring = true;
   if (!s.cx || typeof s.cx !== 'object') s.cx = {lec:{}, done:{}};
   s.cx.lec = s.cx.lec || {}; s.cx.done = s.cx.done || {}; s.cx.phyT = s.cx.phyT || {}; s.cx.phyL = s.cx.phyL || {};
   s.settings.subjects.forEach((x, i) => { if (!x.color) x.color = PALETTE[i % PALETTE.length]; else if (OLD_COLORS[x.color]) x.color = OLD_COLORS[x.color]; });
@@ -845,6 +855,8 @@ function vHome(){
   if (h >= 19 && !peek(today).reviewed) pills.push(`<button class="pill moon" data-a="nav" data-v="review">🌙 Review de 2 min</button>`);
   const T = totals(), sk = streak(tests(T).study);
   if (sk >= 2) pills.push(`<span class="pill">🐞 ${sk} dias seguidos estudando</span>`);
+  const nextAl = S.alarms.filter(a => !a.rung && a.kind === 'timer').sort((a, b) => a.end - b.end)[0];
+  if (nextAl) pills.unshift(`<button class="pill moon" data-a="nav" data-v="timers">⏰ <span class="altime" data-al="${nextAl.id}">${fmtT(nextAl.end - Date.now())}</span></button>`);
   if (pills.length) html += `<div class="pills">${pills.join('')}</div>`;
 
   const ph = photoOfDay();
@@ -962,6 +974,7 @@ function vTimers(){
   html += `<div class="grid">${subjects().map(s => `<button class="tbtn ${S.timer && S.timer.subj===s.id ? 'on' : ''}" style="--c:${esc(s.color)}" data-a="start" data-v="${esc(s.id)}">
     <span class="em">${s.emoji}</span><span class="nm">${esc(s.name)}</span>
     <span class="sm">${S.timer && S.timer.subj===s.id ? 'tocar para parar ■' : `hoje ${fmtMin(td[s.id]||0)}${s.goal ? ` · sem. ${fmtMin(wm[s.id]||0)}/${s.goal}h` : ''}`}</span></button>`).join('')}</div>`;
+  html += vAlarms();
   html += `<button class="btn ghost wide" data-a="openAdd">＋ Adicionar minutos (esqueci de ligar)</button>`;
   html += `<h3>Metas da semana</h3>` + goalsBars(keys, wm, diffDays(keys[0], tk) + 1);
   return html;
@@ -1136,6 +1149,7 @@ function vSettings(){
     <div class="field"><label>Meta Screen Time</label><input data-in="set:screenGoal" inputmode="decimal" value="${Math.floor(st.screenGoal/60)}:${pad(st.screenGoal%60)}"></div>
     <div class="field"><label>Dia: começa / termina</label><div class="row"><input type="time" data-in="set:dayStart" value="${esc(st.dayStart)}"><input type="time" data-in="set:dayEnd" value="${esc(st.dayEnd)}"></div></div>
   </div>
+  <label class="row small" style="margin:6px 0;min-height:44px"><input type="checkbox" data-in="set:ring" style="width:22px;height:22px;min-height:0;accent-color:var(--leaf)" ${st.ring ? 'checked' : ''}> 🔔 Tocar alarme no fim do bloco e da pausa</label>
 
   <h3>📚 Matérias e metas</h3>
   <p class="muted small" style="margin-top:-4px">Emoji · nome · meta semanal (h). Palavras‑chave ligam eventos do calendário à matéria (ex: BCH → Biochem). <b>Estudo</b> = conta como horas de estudo. <b>Prioridade</b> = sugerida primeiro.</p>
@@ -1191,6 +1205,7 @@ function render(){
   $('#view').innerHTML = v === 'timers' ? vTimers() : v === 'review' ? vReview() : v === 'week' ? vWeek() : vHome();
   document.querySelectorAll('nav button').forEach(b => b.classList.toggle('on', b.dataset.v === v));
   $('#overlay').innerHTML = vFocus();
+  updateRing();
   $('#sheet').innerHTML = ui.sheet === 'settings' ? vSettings() : ui.sheet === 'add' ? vAdd() : ui.sheet === 'gallery' ? vGallery() : '';
   document.body.style.overflow = (ui.sheet || $('#overlay').innerHTML) ? 'hidden' : '';
   tick(true);
@@ -1217,11 +1232,82 @@ function chime(){
     if (navigator.vibrate) navigator.vibrate([120, 80, 120]);
   } catch(e) {}
 }
+/* ==================== timers that ring ==================== */
+/* The sound is scheduled on the audio clock, so on a computer it rings on time even in a background tab.
+   On iPhone, web apps are paused in the background: it rings only while Começo is open (we keep the screen on). */
+const ALARM_NODES = {};
+let wakeLock = null;
+function scheduleSound(a){
+  unlockAudio(); if (!AC) return;
+  silence(a.id);
+  try {
+    const g = AC.createGain(); g.gain.value = 1; g.connect(AC.destination);
+    const t0 = AC.currentTime + Math.max(0.05, (a.end - Date.now()) / 1000);
+    for (let r = 0; r < 60; r++) {                       // about 90 s of ringing
+      const t = t0 + r * 1.5;
+      [880, 1175, 1568].forEach((f, i) => { const o = AC.createOscillator(), e = AC.createGain(); o.type = 'triangle'; o.frequency.value = f;
+        e.gain.setValueAtTime(0, t + i*.14); e.gain.linearRampToValueAtTime(.3, t + i*.14 + .02); e.gain.exponentialRampToValueAtTime(.001, t + i*.14 + .5);
+        o.connect(e); e.connect(g); o.start(t + i*.14); o.stop(t + i*.14 + .55); });
+    }
+    ALARM_NODES[a.id] = g;
+  } catch(e) {}
+}
+function silence(id){ const g = ALARM_NODES[id]; if (g) { try { g.disconnect(); } catch(e) {} delete ALARM_NODES[id]; } }
+const liveAlarms = () => S.alarms.filter(a => !a.rung || Date.now() - a.rung < 90e3);
+function rescheduleAll(){ for (const a of liveAlarms()) scheduleSound(a); }
+function keepAwake(){
+  try {
+    const need = S.alarms.some(a => !a.rung);
+    if (need && !wakeLock && navigator.wakeLock) navigator.wakeLock.request('screen').then(l => { wakeLock = l; l.addEventListener('release', () => { wakeLock = null; }); }).catch(() => {});
+    if (!need && wakeLock) { wakeLock.release(); wakeLock = null; }
+  } catch(e) {}
+}
+function askNotify(){ try { if ('Notification' in window && Notification.permission === 'default') Notification.requestPermission().catch(() => {}); } catch(e) {} }
+function notifyAlarm(a){
+  try {
+    if (!('Notification' in window) || Notification.permission !== 'granted') return;
+    const opts = {body: a.label + ' — tempo!', tag: a.id};
+    if (navigator.serviceWorker && location.protocol === 'https:') navigator.serviceWorker.getRegistration().then(r => r ? r.showNotification('⏰ Começo', opts) : new Notification('⏰ Começo', opts)).catch(() => {});
+    else new Notification('⏰ Começo', opts);
+  } catch(e) {}
+}
+function addAlarm(min, label, kind){
+  unlockAudio(); askNotify();
+  const a = {id: 'al' + uid(), label: label || `Timer ${fmtMin(min)}`, end: Date.now() + min*6e4, kind: kind || 'timer'};
+  S.alarms.push(a); save(); scheduleSound(a); keepAwake(); return a.id;
+}
+function removeAlarm(id){ silence(id); S.alarms = S.alarms.filter(a => a.id !== id); save(); keepAwake(); updateRing(); }
+function vRing(){
+  const r = S.alarms.filter(a => a.rung); if (!r.length) return '';
+  return `<div class="ringov" role="alertdialog" aria-label="Alarme"><div class="ringbox"><div class="bell">⏰</div><h2>Tempo!</h2>
+    <p>${r.map(a => esc(a.label)).join('<br>')}</p><button class="btn wide" data-a="stopRing">Parar</button></div></div>`;
+}
+function updateRing(){ const el = $('#ring'); if (el) el.innerHTML = vRing(); }
+function checkAlarms(){
+  const now = Date.now(); let changed = false;
+  for (const a of S.alarms) if (!a.rung && now >= a.end) {
+    a.rung = now; changed = true; notifyAlarm(a);
+    if (!ALARM_NODES[a.id]) scheduleSound(a);            // e.g. after a reload
+  }
+  if (changed) { save(); updateRing(); keepAwake(); try { navigator.vibrate && navigator.vibrate([400, 200, 400, 200, 400]); } catch(e) {} }
+  document.querySelectorAll('[data-al]').forEach(el => { const a = S.alarms.find(x => x.id === el.dataset.al); if (a) el.textContent = a.rung ? 'tocando!' : fmtT(a.end - now); });
+}
+function vAlarms(){
+  const list = S.alarms.map(a => `<div class="dl"><span>⏰</span><span>${esc(a.label)}</span><span class="altime" data-al="${a.id}">${a.rung ? 'tocando!' : fmtT(a.end - Date.now())}</span>
+    <button class="pin on" style="opacity:1" data-a="alarmX" data-v="${a.id}" aria-label="Cancelar">✕</button></div>`).join('');
+  return `<div class="card"><b>⏰ Timer que toca</b><p class="muted small" style="margin:2px 0 8px">Um toque = começa. Toca até você parar. Pode ter vários ao mesmo tempo.</p>
+    <div class="chips">${[5,10,15,20,25,30,45,60].map(n => `<button class="chip big" data-a="alarm" data-v="${n}">${n} min</button>`).join('')}</div>
+    <div class="row"><input id="alarmMin" inputmode="numeric" placeholder="outro (min)" maxlength="3"><button class="btn" data-a="alarmCustom">Começar</button></div>
+    ${list ? `<div style="margin-top:8px">${list}</div>` : ''}
+    <p class="muted small" style="margin:10px 0 0">💻 No computador: toca mesmo em outra aba. 📱 No iPhone: deixe o Começo aberto — a tela fica acesa enquanto o timer roda.</p></div>`;
+}
+
 function startTimer(id, plan, task, taskI){
   unlockAudio();
   if (S.timer) finishTimer(true);
   S.brk = null;
   S.timer = {subj:id, start:Date.now(), plan: plan || S.settings.block, task: task || '', taskI: taskI, chimed:false};
+  if (S.settings.ring) S.timer.alarmId = addAlarm(S.timer.plan, `Fim do bloco · ${subj(id).name}`, 'focus');
   S.lastSubj = id; ui.focusMin = false; save(); render();
 }
 function finishTimer(silent){
@@ -1232,6 +1318,7 @@ function finishTimer(silent){
     if (v === null) return -1;
     min = Math.max(0, parseInt(v, 10) || 0);
   }
+  if (t.alarmId) removeAlarm(t.alarmId);
   S.timer = null;
   if (min >= 1) S.sessions.push({id:uid(), subj:t.subj, start:t.start, min});
   save();
@@ -1258,12 +1345,12 @@ function tick(force){
     if (ring) ring.setAttribute('stroke-dashoffset', String(339.29 * (1 - Math.min(1, el / (S.timer.plan*6e4)))));
     const reached = el >= S.timer.plan*6e4, bm = $('[data-tick="brkmsg"]');
     if (bm) bm.hidden = !reached;
-    if (reached && !S.timer.chimed) { S.timer.chimed = true; save(); chime(); }
+    if (reached && !S.timer.chimed) { S.timer.chimed = true; save(); if (!S.timer.alarmId) chime(); }
   }
   if (S.brk) {
     const left = S.brk.until - now;
     document.querySelectorAll('[data-tick="brk"]').forEach(e => e.textContent = left > 0 ? fmtT(left) : '00:00');
-    if (left <= 0 && !S.brk.done) { S.brk.done = true; save(); chime(); const l = $('[data-tick="brkline"]'); if (l) l.textContent = 'Pausa acabou. Pronta para mais um bloco? 🌱'; }
+    if (left <= 0 && !S.brk.done) { S.brk.done = true; save(); if (!S.brk.alarmId) chime(); const l = $('[data-tick="brkline"]'); if (l) l.textContent = 'Pausa acabou. Pronta para mais um bloco? 🌱'; }
   }
   const m = new Date().getMinutes();
   if (!force && m !== lastMinute && lastMinute !== -1 && ui.view === 'home' && !ui.sheet && !S.timer) safeRender();
@@ -1363,6 +1450,10 @@ const A = {
     if (S.cx.phyT[v]) toast(`Dominado! 🧲 ${PHY_TOPICS.filter(([id]) => S.cx.phyT[id]).length}/6`); },
   phyL: v => { if (S.cx.phyL[v]) delete S.cx.phyL[v]; else S.cx.phyL[v] = true; save(); render();
     if (S.cx.phyL[v]) toast(`Aula processada 🧲 · faltam ${PHY_LECS.filter(x => !S.cx.phyL[x]).length}`); },
+  alarm: n => { addAlarm(+n); render(); toast(`⏰ Timer de ${n} min — toca às ${clock(Date.now() + n*6e4)}`); },
+  alarmCustom: () => { const n = parseInt(($('#alarmMin') || {}).value, 10); if (!(n > 0 && n <= 600)) { toast('Digita os minutos 🙂'); return; } A.alarm(n); },
+  alarmX: v => { removeAlarm(v); render(); },
+  stopRing: () => { S.alarms.filter(a => a.rung).forEach(a => removeAlarm(a.id)); updateRing(); render(); },
   dlDone: v => { S.cx.done[v] = true; save(); render(); toast('Feito! 🐞'); },
   noteX: v => { const d = day(dk()); d.dis = d.dis || {}; d.dis[v] = true; save(); render(); },
   anki: v => { const d = day(dk()); d.anki = v === '1'; d.cl = d.cl || {}; d.cl.anki = d.anki; save(); render(); if (d.anki) toast('Anki feito 🃏'); },
@@ -1372,9 +1463,9 @@ const A = {
   minimize: () => { ui.focusMin = true; render(); },
   stop: () => { if (finishTimer(false) !== -1) render(); },
   stopBreak: () => { const t = S.timer; if (!t) return; const id = t.subj; if (finishTimer(true) >= 0) {
-      S.brk = {until: Date.now() + S.settings.brk*6e4, subj: id}; save(); render(); toast('Bloco salvo ✓ Agora, pausa.'); } },
-  brkBack: () => { const id = S.brk ? S.brk.subj : S.lastSubj; S.brk = null; startTimer(id, S.settings.block); },
-  brkEnd: () => { S.brk = null; save(); render(); celebrate('Bom trabalho! 🐞', sessionNote()); },
+      S.brk = {until: Date.now() + S.settings.brk*6e4, subj: id}; if (S.settings.ring) S.brk.alarmId = addAlarm(S.settings.brk, 'Fim da pausa ☕', 'break'); save(); render(); toast('Bloco salvo ✓ Agora, pausa.'); } },
+  brkBack: () => { const id = S.brk ? S.brk.subj : S.lastSubj; if (S.brk && S.brk.alarmId) removeAlarm(S.brk.alarmId); S.brk = null; startTimer(id, S.settings.block); },
+  brkEnd: () => { if (S.brk && S.brk.alarmId) removeAlarm(S.brk.alarmId); S.brk = null; save(); render(); celebrate('Bom trabalho! 🐞', sessionNote()); },
   tcheck: (i, el) => { const d = day(dk()), t = d.tasks[+i]; if (!t) return; t.done = !t.done; if (t.done) { t.pinned = false; const r = el.getBoundingClientRect(); flyBug(r.left + 3, r.top); toast('Feito! 🐞'); } save(); render(); },
   tpin: i => { const d = day(dk()); d.tasks.forEach((t, j) => t.pinned = j === +i ? !t.pinned : false); save(); render(); },
   taskAdd: () => { const inp = $('#newTask'); const v = (inp && inp.value || '').trim(); if (!v) { inp && inp.focus(); return; }
@@ -1455,6 +1546,8 @@ document.addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.id
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState !== 'visible') return;
   if (Date.now() - (S.cal.at||0) > 10*6e4) fetchCal(false);
+  if (AC) { try { AC.resume(); } catch(e) {} rescheduleAll(); }   // iPhone pauses audio in the background
+  keepAwake(); checkAlarms();
   safeRender();
 });
 
@@ -1462,7 +1555,10 @@ document.addEventListener('visibilitychange', () => {
 $('#logoBug').innerHTML = bugSVG();
 applyTheme();
 render();
-setInterval(() => tick(false), 1000);
+setInterval(() => { tick(false); checkAlarms(); }, 1000);
+/* audio can only start after a tap: arm any saved timers on the first touch */
+document.addEventListener('pointerdown', () => { if (!AC && S.alarms.length) { unlockAudio(); rescheduleAll(); } }, {capture: true});
+S.alarms = S.alarms.filter(a => !(a.rung && Date.now() - a.rung > 30*6e4) && !(!a.rung && Date.now() - a.end > 30*6e4));
 fetchCal(false);
 loadPhotos().then(() => { if (PH.length) safeRender(); });
 if ('serviceWorker' in navigator && location.protocol === 'https:') {
