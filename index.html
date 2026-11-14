@@ -495,7 +495,28 @@ function totals(){ const T = {}; for (const s of S.sessions) { const k = dk(s.st
 function sumKeys(T, keys){ const o = {}; for (const k of keys) { const d = T[k]; if (d) for (const id in d) o[id] = (o[id]||0) + d[id]; } return o; }
 const sumIds = (o, ids) => ids.reduce((a, id) => a + (o[id]||0), 0);
 const gymDay = (T, k) => peek(k).gym === true || ((T[k]||{}).gym || 0) > 0;
-const tasksOf = k => peek(k).tasks.map((t,i) => ({...t, i})).filter(t => (t.t||'').trim());
+const tasksOf = k => peek(k).tasks.map((t,i) => ({...t, i})).filter(t => (t.t||'').trim() && !t.moved);
+/* unchecked tasks (priorities and extras) from previous days move to today, tagged with the day they came from */
+function carryOver(){
+  const today = dk(); if (S.lastRoll === today) return;
+  const keys = Object.keys(S.days).filter(k => k < today && k >= addDays(today, -7)).sort();
+  const pri = [], ext = [];
+  for (const k of keys) { const d = S.days[k];
+    (d.tasks || []).forEach(x => { if ((x.t || '').trim() && !x.done && !x.moved) { x.moved = today; pri.push({t:x.t, done:false, pinned:!!x.pinned, from:x.from || k}); } });
+    (d.extra || []).forEach(x => { if ((x.t || '').trim() && !x.done && !x.moved) { x.moved = today; ext.push({t:x.t, done:false, from:x.from || k}); } });
+  }
+  S.lastRoll = today;
+  if (pri.length || ext.length) {
+    const t = day(today);
+    t.tasks = pri.concat(t.tasks.filter(x => (x.t || '').trim()));
+    if (t.tasks.some(x => x.pinned)) { let seen = false; t.tasks.forEach(x => { if (x.pinned) { if (seen) x.pinned = false; seen = true; } }); }
+    if (ext.length) t.extra = ext.concat(t.extra || []);
+    ui.open.tasks = true;
+    setTimeout(() => toast(`↩︎ ${pri.length + ext.length} tarefa${pri.length + ext.length === 1 ? '' : 's'} não feita${pri.length + ext.length === 1 ? '' : 's'} continua${pri.length + ext.length === 1 ? '' : 'm'} aqui`), 400);
+  }
+  save();
+}
+const fromTag = f => f ? `<span class="tag">↩︎ ${f === addDays(dk(), -1) ? 'de ontem' : 'de ' + fmtDM(f)}</span>` : '';
 
 function matchSubj(text){
   text = String(text||'');
@@ -980,17 +1001,17 @@ function vTimeline(){
 function vTasks(){
   const k = dk(), tk = tasksOf(k);
   let html = tk.map(t => `<div class="task ${t.done?'done':''}"><button class="check" data-a="tcheck" data-v="${t.i}" aria-label="Feito">${t.done?'✓':''}</button>
-    <span class="tx">${esc(t.t)}</span><button class="pin ${t.pinned?'on':''}" data-a="tpin" data-v="${t.i}" aria-label="Fixar">📌</button></div>`).join('');
+    <span class="tx">${esc(t.t)}${fromTag(t.from)}</span><button class="pin ${t.pinned?'on':''}" data-a="tpin" data-v="${t.i}" aria-label="Fixar">📌</button></div>`).join('');
   if (!tk.length) html += `<p class="muted small">Nada ainda. Escolhe até 3 coisas — ou deixa o card lá em cima te guiar.</p>`;
   if (tk.length < 3) html += `<div class="row" style="margin-top:6px"><input id="newTask" placeholder="Adicionar prioridade…" enterkeyhint="done" maxlength="80"><button class="btn" data-a="taskAdd" aria-label="Adicionar">＋</button></div>`;
   if (tk.length) html += `<p class="muted small" style="margin:8px 0 0">📌 = fixar. A tarefa fixada vira o “Faça isso agora”.</p>`;
   /* extras: "Também quero fazer" opens only after the 3 priorities are done */
-  const ex = peek(k).extra || [], unlocked = tk.length >= 3 && tk.every(t => t.done);
-  if (tk.length >= 3 && !unlocked) {
+  const ex = peek(k).extra || [], unlocked = (tk.length >= 3 || ex.length > 0) && tk.every(t => t.done);
+  if ((tk.length >= 3 || ex.length) && !unlocked) {
     html += `<p class="muted small" style="margin:12px 0 0">🔒 <b>Também quero fazer</b> abre quando as 3 prioridades estiverem feitas${ex.length ? ` · ${ex.length} esperando` : ''}.</p>`;
   } else if (unlocked) {
     html += `<p class="small" style="margin:14px 0 2px"><b>✨ Também quero fazer</b></p>` + ex.map((t, i) => `<div class="task ${t.done ? 'done' : ''}">
-      <button class="check" data-a="xcheck" data-v="${i}" aria-label="Feito">${t.done ? '✓' : ''}</button><span class="tx">${esc(t.t)}</span>
+      <button class="check" data-a="xcheck" data-v="${i}" aria-label="Feito">${t.done ? '✓' : ''}</button><span class="tx">${esc(t.t)}${fromTag(t.from)}</span>
       <button class="pin on" style="opacity:.6" data-a="xdel" data-v="${i}" aria-label="Apagar">✕</button></div>`).join('')
       + `<div class="row" style="margin-top:6px"><input id="newExtra" placeholder="Mais uma coisa…" enterkeyhint="done" maxlength="80"><button class="btn" data-a="extraAdd" aria-label="Adicionar">＋</button></div>`;
   }
@@ -1254,6 +1275,7 @@ function vAdd(){
 
 /* ==================== render ==================== */
 function render(){
+  carryOver();
   const v = ui.view;
   $('#view').innerHTML = v === 'timers' ? vTimers() : v === 'review' ? vReview() : v === 'week' ? vWeek() : vHome();
   document.querySelectorAll('nav button').forEach(b => b.classList.toggle('on', b.dataset.v === v));
