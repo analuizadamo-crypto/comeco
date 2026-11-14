@@ -1,5 +1,5 @@
 // Começo service worker — makes the app open offline. Bump VERSION when you change index.html.
-const VERSION = 'comeco-v9';
+const VERSION = 'comeco-v10';
 const CORE = ['./', './index.html', './manifest.webmanifest', './apple-touch-icon.png', './icon-192.png', './icon-512.png'];
 
 self.addEventListener('install', e => {
@@ -17,7 +17,7 @@ self.addEventListener('fetch', e => {
   // The app page: try the network first (so updates arrive), fall back to cache after 3s / offline.
   if (req.mode === 'navigate') {
     e.respondWith(Promise.race([
-      fetch(req).then(r => put('./index.html', r)),
+      fetch(req.url, {cache: 'no-store'}).then(r => put('./index.html', r)),   // skip the browser's 10-min copy
       new Promise((_, rej) => setTimeout(rej, 3000))
     ]).catch(() => caches.match('./index.html')));
     return;
