@@ -909,7 +909,8 @@ function vHome(){
   const tev = todayEvents();
   html += fold('cal', '🗓️ Hoje no calendário', st.calUrl ? `${tev.length} evento${tev.length===1?'':'s'}` : 'conectar', vTimeline());
   const tk = tasksOf(today), done = tk.filter(t => t.done).length;
-  html += fold('tasks', "✅ Today's 3", tk.length ? `${done}/${tk.length}` : 'vazio', vTasks());
+  const exL = peek(today).extra || [];
+  html += fold('tasks', "✅ Today's 3", tk.length ? `${done}/${tk.length}${exL.length ? ` + ${exL.filter(t => t.done).length}/${exL.length}` : ''}` : 'vazio', vTasks());
   const ci = classItems(today);
   if (ci.length) html += fold('class', '📝 Hoje nas aulas', `${ci.filter(i => clDone(today, i.id)).length}/${ci.length}`, vClass(today, ci));
   if (today <= '2026-12-07') html += fold('lecs', '🧬 BCH Exam 4', `${BCH_LECS.filter(x => !S.cx.lec[x]).length} faltam`, vLecs());
@@ -981,8 +982,18 @@ function vTasks(){
   let html = tk.map(t => `<div class="task ${t.done?'done':''}"><button class="check" data-a="tcheck" data-v="${t.i}" aria-label="Feito">${t.done?'✓':''}</button>
     <span class="tx">${esc(t.t)}</span><button class="pin ${t.pinned?'on':''}" data-a="tpin" data-v="${t.i}" aria-label="Fixar">📌</button></div>`).join('');
   if (!tk.length) html += `<p class="muted small">Nada ainda. Escolhe até 3 coisas — ou deixa o card lá em cima te guiar.</p>`;
-  if (tk.length < 3) html += `<div class="row" style="margin-top:6px"><input id="newTask" placeholder="Adicionar tarefa…" enterkeyhint="done" maxlength="80"><button class="btn" data-a="taskAdd" aria-label="Adicionar">＋</button></div>`;
+  if (tk.length < 3) html += `<div class="row" style="margin-top:6px"><input id="newTask" placeholder="Adicionar prioridade…" enterkeyhint="done" maxlength="80"><button class="btn" data-a="taskAdd" aria-label="Adicionar">＋</button></div>`;
   if (tk.length) html += `<p class="muted small" style="margin:8px 0 0">📌 = fixar. A tarefa fixada vira o “Faça isso agora”.</p>`;
+  /* extras: "Também quero fazer" opens only after the 3 priorities are done */
+  const ex = peek(k).extra || [], unlocked = tk.length >= 3 && tk.every(t => t.done);
+  if (tk.length >= 3 && !unlocked) {
+    html += `<p class="muted small" style="margin:12px 0 0">🔒 <b>Também quero fazer</b> abre quando as 3 prioridades estiverem feitas${ex.length ? ` · ${ex.length} esperando` : ''}.</p>`;
+  } else if (unlocked) {
+    html += `<p class="small" style="margin:14px 0 2px"><b>✨ Também quero fazer</b></p>` + ex.map((t, i) => `<div class="task ${t.done ? 'done' : ''}">
+      <button class="check" data-a="xcheck" data-v="${i}" aria-label="Feito">${t.done ? '✓' : ''}</button><span class="tx">${esc(t.t)}</span>
+      <button class="pin on" style="opacity:.6" data-a="xdel" data-v="${i}" aria-label="Apagar">✕</button></div>`).join('')
+      + `<div class="row" style="margin-top:6px"><input id="newExtra" placeholder="Mais uma coisa…" enterkeyhint="done" maxlength="80"><button class="btn" data-a="extraAdd" aria-label="Adicionar">＋</button></div>`;
+  }
   return html;
 }
 
@@ -1508,11 +1519,18 @@ const A = {
       S.brk = {until: Date.now() + S.settings.brk*6e4, subj: id}; if (S.settings.ring) S.brk.alarmId = addAlarm(S.settings.brk, 'Fim da pausa ☕', 'break'); save(); render(); toast('Bloco salvo ✓ Agora, pausa.'); } },
   brkBack: () => { const id = S.brk ? S.brk.subj : S.lastSubj; if (S.brk && S.brk.alarmId) removeAlarm(S.brk.alarmId); S.brk = null; startTimer(id, S.settings.block); },
   brkEnd: () => { if (S.brk && S.brk.alarmId) removeAlarm(S.brk.alarmId); S.brk = null; save(); render(); celebrate('Bom trabalho! 🐞', sessionNote()); },
-  tcheck: (i, el) => { const d = day(dk()), t = d.tasks[+i]; if (!t) return; t.done = !t.done; if (t.done) { t.pinned = false; const r = el.getBoundingClientRect(); flyBug(r.left + 3, r.top); toast('Feito! 🐞'); } save(); render(); },
+  tcheck: (i, el) => { const d = day(dk()), t = d.tasks[+i]; if (!t) return; t.done = !t.done; if (t.done) { t.pinned = false; const r = el.getBoundingClientRect(); flyBug(r.left + 3, r.top);
+    const tk = tasksOf(dk()); toast(tk.length >= 3 && tk.every(x => x.done) ? '3 prioridades feitas! ✨ “Também quero fazer” liberado' : 'Feito! 🐞'); } save(); render(); },
   tpin: i => { const d = day(dk()); d.tasks.forEach((t, j) => t.pinned = j === +i ? !t.pinned : false); save(); render(); },
   taskAdd: () => { const inp = $('#newTask'); const v = (inp && inp.value || '').trim(); if (!v) { inp && inp.focus(); return; }
     const d = day(dk()); d.tasks = d.tasks.filter(t => (t.t||'').trim()); if (d.tasks.length >= 3) { toast('Só 3 por dia — menos é mais 💛'); return; }
     d.tasks.push({t:v, done:false, pinned:false}); save(); ui.open.tasks = true; render(); },
+  extraAdd: () => { const inp = $('#newExtra'); const v = (inp && inp.value || '').trim(); if (!v) { inp && inp.focus(); return; }
+    const d = day(dk()); d.extra = d.extra || []; if (d.extra.length >= 10) { toast('Já tem bastante pra hoje 💛'); return; }
+    d.extra.push({t:v, done:false}); save(); ui.open.tasks = true; render(); setTimeout(() => { const n = $('#newExtra'); n && n.focus(); }, 0); },
+  xcheck: (i, el) => { const d = day(dk()), t = (d.extra || [])[+i]; if (!t) return; t.done = !t.done;
+    if (t.done) { const r = el.getBoundingClientRect(); flyBug(r.left + 3, r.top); toast('Feito! 🐞'); } save(); render(); },
+  xdel: i => { const d = day(dk()); (d.extra || []).splice(+i, 1); save(); render(); },
   refresh: () => fetchCal(true),
   settings: () => { ui.sheet = 'settings'; render(); },
   close: () => { ui.sheet = null; render(); },
@@ -1584,7 +1602,9 @@ document.addEventListener('change', e => {
   if (e.target.id === 'importFile' && e.target.files && e.target.files[0]) importData(e.target.files[0]);
   if (e.target.id === 'photoFile' && e.target.files && e.target.files.length) addPhotos([...e.target.files]);
 });
-document.addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.id === 'newTask') { e.preventDefault(); A.taskAdd(); } });
+document.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && e.target.id === 'newTask') { e.preventDefault(); A.taskAdd(); }
+  if (e.key === 'Enter' && e.target.id === 'newExtra') { e.preventDefault(); A.extraAdd(); } });
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState !== 'visible') return;
   if (Date.now() - (S.cal.at||0) > 10*6e4) fetchCal(false);
