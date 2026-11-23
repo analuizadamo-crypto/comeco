@@ -436,9 +436,9 @@ const dayOfYear = () => { const n = new Date(); return Math.floor((n - new Date(
 function defaults(){
   return { v:1,
     settings:{ name:'', ring:true, why:'Medicina. Saúde para quem mais precisa.', calUrl:'', block:50, brk:10, screenGoal:120,
-      dayStart:'07:00', dayEnd:'22:00', theme:'auto', prepBase:15, semName:'Fall 2026', semStart:'2026-08-24', semEnd:'2026-12-18',
+      dayStart:'07:00', dayEnd:'22:00', theme:'auto', prepBase:10, semName:'Fall 2026', semStart:'2026-08-24', semEnd:'2026-12-18',
       subjects: clone(DEFAULT_SUBJECTS) },
-    sessions:[], days:{}, timer:null, brk:null, alarms:[], cal:{at:0, events:[], err:''}, cx:{lec:{}, done:{}, phyT:{}, phyL:{}}, archive:[], lastSubj:'bch', lastBackup:0, wait:[], prepAdded:true };
+    sessions:[], days:{}, timer:null, brk:null, alarms:[], cal:{at:0, events:[], err:''}, cx:{lec:{}, done:{}, phyT:{}, phyL:{}}, archive:[], lastSubj:'bch', lastBackup:0, wait:[], prepAdded:true, prepV2:true };
 }
 function load(){
   const d = defaults(); let s = null;
@@ -462,6 +462,7 @@ function normalize(s){
   if (!Array.isArray(s.archive)) s.archive = [];
   if (!Array.isArray(s.alarms)) s.alarms = [];
   if (!Array.isArray(s.wait)) s.wait = [];
+  if (!s.prepV2) { if (s.settings.prepBase === 15) s.settings.prepBase = 10; s.prepV2 = true; }
   if (s.settings.ring === undefined) s.settings.ring = true;
   if (!s.cx || typeof s.cx !== 'object') s.cx = {lec:{}, done:{}};
   s.cx.lec = s.cx.lec || {}; s.cx.done = s.cx.done || {}; s.cx.phyT = s.cx.phyT || {}; s.cx.phyL = s.cx.phyL || {};
@@ -576,10 +577,9 @@ function dayPts(k){ return tasksOf(k).reduce((a, t) => a + taskPts(t).done, 0); 
 
 /* ==================== prep budget: a daily allowance; past it, prep counts AGAINST study time ==================== */
 function prepBudget(k){
-  const parts = [[S.settings.prepBase, 'planejar + buffer']];
-  if (BCH_LECS.includes(k)) parts.push([15, 'aula BCH → Claude/Anki']);
-  if (isPhyLec(k) && k !== '2026-11-12') parts.push([10, 'aula PHY → Claude']);
-  if (parseYmd(k).getDay() === 0) parts.push([20, 'domingo: reorganizar a semana']);
+  const parts = [[S.settings.prepBase, 'planejar o dia + buffer']];
+  if (BCH_LECS.includes(k) || (isPhyLec(k) && k !== '2026-11-12')) parts.push([10, 'dia de aula: mandar pro Claude / Anki']);
+  else if (parseYmd(k).getDay() === 0) parts.push([10, 'domingo: reorganizar a semana']);
   return {min: parts.reduce((a, [m]) => a + m, 0), parts};
 }
 const hasPrep = () => subjects().some(s => s.id === 'prep');
@@ -867,23 +867,6 @@ function nextAction(){
   return {subj:p, title:'Revisão leve', why:'Metas da semana batidas! 🐞 Descansar também é parte do plano.'};
 }
 
-/* ==================== ✨ she writes the task, the app suggests the little steps ==================== */
-function suggestSteps(text){
-  const k = dk(), id = matchSubj(text), t = String(text);
-  const quiz = /quiz/i.test(t), hw = /\b(hw|homework|lista|problem set)\b/i.test(t), exam = /\b(exam|prova|midterm|final)\b/i.test(t), read = /\b(ler|read|artigo|paper|chapter|cap[ií]tulo)\b/i.test(t), write = /\b(escrever|write|essay|draft|statement|redação)\b/i.test(t);
-  if (quiz) return [['Abrir o quiz e ver quantas questões são', 5], ['Anki rápido do conteúdo', 15], ['Fazer o quiz', 25]];
-  if (hw) return [['Abrir a HW e fazer a 1ª questão', 15], ['Mais 2 questões', 25], ['Terminar e entregar', 25]];
-  if (id === 'bch') { const lec = BCH_LECS.find(x => x <= k && !S.cx.lec[x]);
-    if (exam || !lec) return [['Anki do dia', 15], ['5 questões do practice exam', 25], ['Revisar as que errou', 15]];
-    return [[`Assistir 1ª metade da aula ${fmtDM(lec)}`, 25], ['Assistir 2ª metade', 25], ['Anki dessa aula', 15], ['3 questões estilo prova', 15]]; }
-  if (id === 'phy') { const lec = PHY_LECS.find(x => x <= k && !S.cx.phyL[x]);
-    return [[lec ? `Ler o resumo: ${PHY_LEC_TOPIC[lec]}` : 'Ler o resumo do tópico', 10], ['1 problema guiado', 15], ['1 problema sozinha', 20]]; }
-  if (read) return [['Abrir e ler só o resumo/abstract', 10], ['Ler a primeira seção', 20], ['Anotar 3 pontos principais', 10]];
-  if (write) return [['Abrir o documento e escrever 3 frases (qualquer uma)', 10], ['Escrever por 25 min sem editar', 25], ['Reler e marcar o que melhorar', 10]];
-  if (exam) return [['Listar os tópicos da prova', 10], ['Escolher o tópico mais fraco e estudar', 25], ['5 questões desse tópico', 20]];
-  return [['Abrir o que precisa (arquivo, site, material)', 5], ['20 min de foco nisso', 20], ['Fechar: anotar onde parou', 5]];
-}
-
 /* ==================== 🎯 plano de ataque: suggestions she can take or leave ==================== */
 function attackPlan(){
   const k = dk(), out = [], have = new Set(tasksOf(k).map(t => t.t));
@@ -1139,11 +1122,7 @@ function vTasks(){
     if (sts.length) h += `<div class="steps">${sts.map((x, si) => `<div class="step ${x.done ? 'done' : ''}"><button class="sc" data-a="scheck" data-v="${t.i}.${si}" aria-label="Passo feito">${x.done ? '✓' : ''}</button>
       <span class="tx">${esc(x.t)}</span><button class="pt ${x.prep ? 'prep' : ''}" data-a="smin" data-v="${t.i}.${si}" aria-label="Mudar tempo">${x.prep ? '🛠️ prep' : `${x.min}′ · ${ptsTxt(stepPts(x))}`}</button>
       <button class="x" data-a="sdel" data-v="${t.i}.${si}" aria-label="Apagar passo">✕</button></div>`).join('')}</div>`;
-    else if (!t.done) { const sg = suggestSteps(t.t), tot = sg.reduce((a, [, m]) => a + ptsOf(m), 0);
-      h += `<div class="steps"><p class="small" style="margin:0 0 4px;color:var(--atext)">✨ Sugestão de passos · ⭐ ${ptsTxt(tot)}</p>
-        <ol class="small" style="margin:0 0 6px;padding-left:18px">${sg.map(([x, m]) => `<li>${esc(x)} <span class="muted">(${m}′ · ${ptsTxt(ptsOf(m))})</span></li>`).join('')}</ol>
-        <button class="btn green" style="min-height:40px;padding:6px 16px" data-a="sugUse" data-v="${t.i}">✓ Usar esses passos</button>
-        <span class="muted small"> ou escreve os seus ↓</span></div>`; }
+    else if (!t.done) h += `<p class="hint">✏️ Escreve os <b>passos pequenos</b>. O primeiro tem que dar pra começar em 1 minuto.</p>`;
     if (!t.done && (ui.stepFor === t.i || !sts.length)) h += `<div class="stepadd"><input id="stepIn-${t.i}" placeholder="${sts.length ? 'Próximo passo…' : 'ex: abrir os slides da aula 12'}" enterkeyhint="done" maxlength="80">
       <select id="stepMin-${t.i}" aria-label="Minutos">${STEP_MINS.map(m => `<option value="${m}" ${m === 15 ? 'selected' : ''}>${m}′</option>`).join('')}</select><button class="btn" data-a="stepAdd" data-v="${t.i}" aria-label="Adicionar passo">＋</button></div>`;
     else if (!t.done) h += `<p class="hint" style="margin-top:0"><button class="link" data-a="stepFor" data-v="${t.i}">＋ passo</button></p>`;
@@ -1166,7 +1145,6 @@ function vTasks(){
 
 function vPlan(){
   const k = dk(), tk = tasksOf(k), room = 3 - tk.length, pl = attackPlan(), pb = prepBudget(k), left = Math.max(0, pb.min - prepDone(k));
-  const wk = weekKeys(k), wb = wk.map(x => prepBudget(x).min);
   let html = `<p class="muted small" style="margin:0 0 4px">Minhas sugestões, em ordem de importância. Você escolhe — pode mudar tudo.</p>`;
   if (!pl.length) html += `<p class="muted">${k === '2026-11-26' ? 'Hoje é folga 🦃 Nada de plano.' : 'Nada urgente agora 🌿 Escolhe o que fizer sentido.'}</p>`;
   html += pl.slice(0, 4).map((p, i) => { const tot = p.steps.reduce((a, x) => a + (x.prep ? 0 : ptsOf(x.min)), 0), mins = p.steps.reduce((a, x) => a + x.min, 0);
@@ -1176,9 +1154,8 @@ function vPlan(){
   if (room <= 0 && pl.length) html += `<p class="muted small">Today's 3 está cheio. Pra trocar, desmarca ou apaga uma.</p>`;
   html += `<div class="row" style="margin-top:10px;flex-wrap:wrap"><button class="btn" data-a="planTimer">⏱ Planejar · ${Math.min(10, left) || 5} min</button>
     <span class="muted small" style="flex:1;min-width:160px">Conta como 🛠️ prep. Quando tocar: chega de planejar, começa.</span></div>
-  <details class="help" style="margin-top:10px"><summary>🛠️ Prep: hoje ${fmtMin(pb.min)} · semana ${fmtMin(wb.reduce((a, x) => a + x, 0))}</summary>
-    <p class="small" style="margin:6px 0"><b>Hoje:</b> ${pb.parts.map(([m, t]) => `${m} min ${esc(t)}`).join(' + ')}.</p>
-    <p class="small" style="margin:0 0 6px"><b>Esta semana:</b> ${fmtMin(wb.reduce((a, x) => a + x, 0))} no total (≈ ${fmtMin(Math.round(wb.reduce((a, x) => a + x, 0) / 7))}/dia) · usado até agora: ${fmtMin(wk.reduce((a, x) => a + prepDone(x), 0))}.</p>
+  <details class="help" style="margin-top:10px"><summary>🛠️ Limite de prep hoje: ${fmtMin(pb.min)}</summary>
+    <p class="small" style="margin:6px 0">${pb.parts.map(([m, t]) => `${m} min ${esc(t)}`).join(' + ')}.</p>
     <p class="small" style="margin:0">Prep = planejar, mandar aula pro Claude, fazer cards, reorganizar o calendário. Até o limite, tudo certo. <b>Passou, cada minuto a mais desconta do estudo do dia.</b> A base muda em ⚙️.</p></details>
   <details class="help"><summary>📋 Colar um plano (do Claude, por ex.)</summary><p class="small" style="margin:6px 0">Uma tarefa por linha. Passos começam com “-”. Minutos no fim (opcional):</p>
     <pre class="small" style="white-space:pre-wrap;margin:0 0 6px">Estudar Biochem\n- assistir aula 17/11 · 25\n- Anki da aula · 15</pre>
@@ -1788,7 +1765,6 @@ const A = {
     if (st.prep) { st.prep = false; } else { const j = STEP_MINS.indexOf(st.min); if (j === STEP_MINS.length - 1) st.prep = true; st.min = STEP_MINS[(j + 1) % STEP_MINS.length]; if (st.prep) st.min = 15; }
     save(); render(); },
   sdel: v => { const [ti, si] = v.split('.').map(Number), t = day(dk()).tasks[ti]; if (!t || !t.steps) return; t.steps.splice(si, 1); save(); render(); },
-  sugUse: v => { const t = day(dk()).tasks[+v]; if (!t) return; t.steps = suggestSteps(t.t).map(([x, m]) => ({t:x, min:m, done:false, prep:false})); ui.stepFor = null; save(); render(); toast('✨ Passos prontos. Agora é só o primeiro.'); },
   stepFor: v => { ui.stepFor = +v; render(); const n = $('#stepIn-' + v); n && n.focus(); },
   stepAdd: v => { const i = +v, inp = $('#stepIn-' + i), val = (inp && inp.value || '').trim(); if (!val) { inp && inp.focus(); return; }
     const t = day(dk()).tasks[i]; if (!t) return; t.steps = t.steps || [];
