@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Calendário de Finals</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Lexend:wght@500;700&family=Atkinson+Hyperlegible:wght@400;700&display=swap" rel="stylesheet">
+<style>
+/* VOICE everyday study: calm, clear, nothing to decode
+   IDEA a pocket exam-season planner: a strip of days, then one card per day that opens
+   PICTURE the 15-day strip, exam days standing tall in white, today outlined
+   COLOUR night ground (she studies in dark mode); rose biochem, sky physics, coral CHC, lilac WST
+   TYPE Lexend 700 for dates and titles + Atkinson Hyperlegible for reading
+   LAYOUT one column up to 760px; strip scrolls sideways on a phone, cards stack */
+:root{color-scheme:dark;--bg:#0b0b10;--card:#15151d;--card2:#1c1c26;--line:#2a2a36;--ink:#f3f1ec;--mut:#aeacb8;--b:#ff6b9a;--p:#5ec8ff;--c:#ff9a62;--w:#c6a8ff;--o:#9aa0a6}
+*{box-sizing:border-box;min-width:0}
+html,body{margin:0;background:var(--bg);color:var(--ink)}
+body{font:17px/1.55 "Atkinson Hyperlegible",system-ui,sans-serif;overflow-x:clip}
+.wrap{max-width:760px;margin:0 auto;padding:24px max(16px,4vw) 64px}
+h1{font:700 clamp(30px,6vw,44px)/1.05 Lexend,system-ui,sans-serif;letter-spacing:-.02em;margin:0 0 6px}
+.sub{color:var(--mut);margin:0 0 18px;font-size:16px}
+.scroll{overflow-x:auto;scrollbar-width:none;margin:0 -4px 14px;padding:4px}
+.strip{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(44px,1fr);gap:5px;align-items:end}
+.d{all:unset;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:4px;height:66px;border-radius:12px;background:var(--card);padding:6px 0 8px;font-size:13px;color:var(--mut);position:relative}
+.d b{font:700 17px Lexend,sans-serif;color:var(--ink)}
+.d .dots{display:flex;gap:3px;height:7px}
+.d .dots i{width:7px;height:7px;border-radius:50%}
+.d.ex{height:98px;background:var(--ink);color:#0b0b10}
+.d.ex b{color:#0b0b10}
+.d.ex em{font:700 13px Lexend,sans-serif;font-style:normal}
+.d.today{outline:2px solid var(--ink);outline-offset:2px}
+.d.ex.today{outline-color:var(--b)}
+.d.done{opacity:.55}
+.d:focus-visible{outline:2px solid var(--p);outline-offset:2px}
+.legend{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:14px;color:var(--mut);margin:0 0 14px}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.legend i{width:10px;height:10px;border-radius:50%}
+.rule{background:var(--card);border-radius:14px;padding:12px 16px;margin:0 0 22px;font-size:16px}
+.rule strong{color:var(--ink)}
+.day{background:var(--card);border-radius:16px;margin:0 0 10px;overflow:hidden;scroll-margin-top:16px}
+.day.exam{box-shadow:inset 0 0 0 2px var(--ink)}
+.hd{all:unset;cursor:pointer;display:grid;grid-template-columns:58px minmax(0,1fr) auto;gap:12px;align-items:start;width:100%;padding:14px 16px;box-sizing:border-box}
+.hd:focus-visible{outline:2px solid var(--p);outline-offset:-2px;border-radius:16px}
+.date{display:flex;flex-direction:column;align-items:center;line-height:1}
+.date b{font:700 30px Lexend,sans-serif;letter-spacing:-.02em}
+.date small{font-size:13px;color:var(--mut);margin-top:4px}
+.tt strong{display:block;font:700 19px/1.2 Lexend,sans-serif;margin:2px 0 6px}
+.mini{list-style:none;margin:0;padding:0;font-size:15px;color:var(--mut)}
+.mini li{display:flex;gap:8px;align-items:baseline;margin:2px 0}
+.mini i{flex:none;width:8px;height:8px;border-radius:50%;transform:translateY(-1px)}
+.cnt{font:500 14px Lexend,sans-serif;color:var(--mut);white-space:nowrap;padding-top:4px}
+.cnt.ok{color:var(--ink)}
+.side{display:flex;flex-direction:column;align-items:flex-end;gap:8px}
+.chev{font:700 13px Lexend,sans-serif;color:var(--ink);background:var(--card2);border-radius:999px;padding:4px 10px;white-space:nowrap}
+.day.open .chev .o{display:none}.day:not(.open) .chev .c{display:none}
+.bd{display:none;padding:0 16px 16px 86px}
+.day.open .bd{display:block}
+.day.open .mini{display:none}
+.why{background:var(--card2);border-radius:12px;padding:12px 14px;margin:0 0 14px;font-size:16px}
+.why strong{display:block;font:700 15px Lexend,sans-serif;margin-bottom:2px}
+h3{font:700 15px Lexend,sans-serif;margin:14px 0 6px;color:var(--mut)}
+.fixed{list-style:none;margin:0;padding:0;font-size:15px}
+.fixed li{padding:5px 0;border-top:1px solid var(--line)}
+.fixed li:first-child{border-top:0}
+.tasks{list-style:none;margin:0;padding:0}
+.tasks label{display:grid;grid-template-columns:24px minmax(0,1fr);gap:10px;align-items:start;padding:8px 0;cursor:pointer;border-top:1px solid var(--line)}
+.tasks li:first-child label{border-top:0}
+.tasks input{appearance:none;width:22px;height:22px;margin:2px 0 0;border-radius:6px;border:2px solid var(--mut);display:grid;place-items:center;cursor:pointer}
+.tasks input:checked{background:var(--ink);border-color:var(--ink)}
+.tasks input:checked::after{content:"";width:6px;height:11px;border:solid #0b0b10;border-width:0 3px 3px 0;transform:rotate(45deg) translate(-1px,-1px)}
+.tasks input:focus-visible{outline:2px solid var(--p);outline-offset:2px}
+.tasks input:checked+span{color:var(--mut)}
+.tag{display:inline-block;font:700 13px Lexend,sans-serif;margin-right:6px}
+.t-b{color:var(--b)}.t-p{color:var(--p)}.t-c{color:var(--c)}.t-w{color:var(--w)}.t-o{color:var(--o)}
+.i-b{background:var(--b)}.i-p{background:var(--p)}.i-c{background:var(--c)}.i-w{background:var(--w)}.i-o{background:var(--o)}
+.how{margin-top:28px;background:var(--card);border-radius:16px;padding:16px}
+.how h2{font:700 20px Lexend,sans-serif;margin:0 0 8px}
+.how p{margin:6px 0;font-size:16px}
+.reset{all:unset;cursor:pointer;margin-top:10px;font-size:14px;color:var(--mut);text-decoration:underline;min-height:44px;display:inline-flex;align-items:center}
+@media(max-width:600px){.bd{padding:0 16px 16px}.hd{grid-template-columns:48px minmax(0,1fr) auto;gap:10px}.date b{font-size:26px}}
+@media(prefers-reduced-motion:no-preference){.day{transition:box-shadow .2s}}
+</style>
+</head>
+<body>
+<div class="wrap">
+<h1>Finals: 26/nov a 10/dez</h1>
+<p class="sub">Toque em "abrir" em cada dia: aparece o porquê, os horários fixos e a lista pra marcar.</p>
+<div class="scroll"><div class="strip" id="strip"></div></div>
+<div class="legend">
+<span><i class="i-b"></i>Biochem</span><span><i class="i-p"></i>Physics</span><span><i class="i-c"></i>CHC</span><span><i class="i-w"></i>WST</span><span><i class="i-o"></i>Outros</span>
+</div>
+<p class="rule"><strong>Fez o obrigatório? O dia contou. Fez o bônus? Você é foda.</strong> Não fez? Vai pro próximo dia livre e um bônus sai. Nunca fazer dois dias em um.</p>
+<div id="days"></div>
+<section class="how">
+<h2>Como estudar cada lecture de biochem</h2>
+<p><strong>Lecture nova:</strong> assistir em 2x (pausando nos slides com figura) → explicar em voz alta sem olhar → deck de 30–50 cards → questões.</p>
+<p><strong>Lecture que você já viu:</strong> não reassistir. Pedir no projeto de biochem um transcript simplificado, por slide, com as palavras da professora → explicar em voz alta → deck → questões.</p>
+<p><strong>Physics (Study Edge):</strong> concept videos da session (velocidade normal) → End of Packet Problems → HW → provas antigas e Mock Exam com vídeo de solução. As reviews gravadas podem ser em 1.5–2x. Sem Anki. Sempre fazer problemas, não só assistir.</p>
+<button class="reset" id="reset" type="button">Desmarcar tudo</button>
+</section>
+</div>
+<script>
+{
+const D=[
+{id:"2026-11-26",wd:"qui",n:26,title:"Translation",fixed:["Almoço de Thanksgiving","Já feito hoje: Anki da 11/16"],
+must:[["b","Ler o transcript da 11/17","Translation: o transcript organizado que está no projeto de biochem"],["b","Anki da 11/17","Pedir o deck no projeto de biochem (30–50 cards, cloze + image occlusion) e fazer os cards novos"]],
+bonus:[["b","Assistir a 11/18","Growth factor signaling e cell cycle, em 2x"]],
+why:"A manhã não rendeu, então hoje é só o essencial da 11/17 enquanto ela está fresca (você assistiu ontem). As questões da 11/17 vão pra sexta."},
+{id:"2026-11-27",wd:"sex",n:27,title:"11/18 + Ch 15",fixed:["Livre o dia todo (GRMR cancelado)"],
+must:[["b","11/17: 10 questões","Do Claude, marcadas. Refazer as erradas"],["b","11/18 Signaling e cell cycle","Assistir em 2x (se não viu ontem) + deck novo + 10 questões"],["p","Study Edge Session 11, parte Ch 15","Vídeos \"Waves\" (15 min) e \"Energy in Waves: Intensity and the Doppler Effect\" (34 min) → Chapter 15 End of Packet Problems → HW 13: só as questões de intensidade, dB e Doppler"],["b","Anki","Reviews dos decks 11/16 e 11/17 + cards novos da 11/18"],["o","Recados (10 min)","Mensagem pra Kaylin (rascunho no doc), avisar Darlin e Santiago, GRMR feedback form"]],
+bonus:[["b","Começar a 11/20","DNA damage and repair"]],
+why:"É o único dia inteiro livre antes da prova. O Ch 15 entra hoje porque o HW 13 vence quarta às 12h e quarta você não vai ter tempo. A Kaylin precisa responder antes de sábado, quando você escolhe os artigos."},
+{id:"2026-11-28",wd:"sáb",n:28,title:"MOC + DNA damage + CHC",fixed:["Exame de intérprete do MOC","Talvez filme à noite"],
+must:[["o","Exame do MOC","Sem estudar pra ele: não precisa passar"],["b","11/20 DNA damage and repair","Assistir em 2x + o vídeo curto de homologous recombination + deck novo + 10 questões"],["c","CHC, bloco 1 (~2h)","Escolher 2–3 artigos (lista no doc), ler e preencher o Excel da Kaylin"],["b","Anki","Reviews dos decks 11/16, 11/17 e 11/18 + cards novos da 11/20"]],
+bonus:[["b","Transcription: penúltima lecture","Assistir em 2x"]],
+why:"A 11/20 continua a história de replication (dano → reparo), e na segunda tem um SI ao vivo só sobre esse tema. O CHC no fim de semana deixa a quinta livre antes da apresentação. Se a Kaylin não respondeu, comece por IMC/peso, que foi o que você ofereceu. O filme é descanso, não atraso."},
+{id:"2026-11-29",wd:"dom",n:29,title:"Ch 16 + CHC slides",fixed:["Estrada pra Gainesville ~18h"],
+must:[["p","Study Edge Session 11, parte Ch 16","Vídeos \"Standing Waves\" (15 min) e \"Interference\" (9 min) → End of Packet Problems de standing waves → HW 13: questões de ondas estacionárias"],["c","CHC, bloco 2 (~2h)","Slides no template do grupo, até 60 s cada"],["w","WST: Post #8 + WST 3371","Post #8 sobre Serchen et al. (75+ palavras, vence seg 9:30) + PD Assignment #3 + currículo (extra credit)"],["b","Anki","Reviews dos decks 11/16, 11/17, 11/18 e 11/20"],["o","Check-in","Reorganizar a semana no projeto antes da estrada"]],
+bonus:[["b","Transcription: penúltima lecture","Se não viu no sábado"],["b","Revisão por voz na estrada","Só com as mãos livres"]],
+why:"Adiantar o HW 13 hoje tira peso de terça e quarta, que já estão cheias. Com os slides do CHC prontos hoje, na quinta é só revisar. O post de WST vence segunda antes da aula."},
+{id:"2026-11-30",wd:"seg",n:30,title:"Lecture nova + transcription",fixed:["WST 9:35–10:25","SI com Ishaan 6:15pm (obrigatório, câmera ligada)","SI Deep Dive DNA damage 7–8pm (só ao vivo)"],
+must:[["w","Aula de WST 9:35",""],["b","Lecture gravada de 30/nov","Assistir em 2x + Class 49 (remote participation) + deck novo + 10 questões"],["b","Transcription: as duas últimas lectures","Assistir em 2x (a penúltima, se não viu no fim de semana, e a última)"],["b","SI com Ishaan 6:15pm","Levar as dúvidas de 11/17 a 11/20"],["b","Anki","Reviews dos decks 11/16, 11/17, 11/18 e 11/20 + cards novos de 30/nov"]],
+bonus:[["b","SI Deep Dive 7–8pm","DNA damage: revisa a 11/20"]],
+why:"As lectures desta semana já estão gravadas: fazer a de hoje no dia mantém a remote participation em dia. As duas últimas de transcription saem hoje; o deck e as questões de transcription ficam pra quinta à tarde."},
+{id:"2026-12-01",wd:"ter",n:1,title:"HW 13 fecha hoje",fixed:["Physics 11:45–12:35 (16.5–16.7)","MOC make-up 1–3pm"],
+must:[["p","Perusall 16.5–7","Até 9am"],["b","Lecture gravada de 1/dez","De manhã: assistir em 2x + Class 50 + deck novo + 10 questões"],["p","Terminar e entregar o HW 13","Depois da aula: questões de interferência e batimento"],["w","WST 3371 Takeaway","Rápido, vence quarta"],["b","Anki","Reviews dos decks 11/16 a 11/20 e 30/nov + cards novos de 1/dez"]],
+bonus:[["p","Study Edge Session 11 Live Review","Gravação em 1.5–2x"],["b","D1 DNA structure","Transcript simplificado + deck"]],
+why:"O HW 13 vence amanhã às 12h e amanhã não sobra tempo. A aula de hoje é a última matéria nova de physics e cobre a última parte do HW."},
+{id:"2026-12-02",wd:"qua",n:2,title:"Sem estudo",fixed:["WST 9:35","BCH revisão presencial 10:40–11:30","MOC clínica 1–4pm + escritório 4:55–7pm","PCA 8pm: você pediu pra sair"],
+must:[["w","WST em aula","Responder o Post #8 e o Take Away"],["b","Revisão presencial de biochem","+ Class 51 (remote participation)"],["p","Conferir o HW 13","Entregue antes das 12h"],["o","MOC","Levar o formulário Clinical Skills Feedback"]],
+bonus:[["b","Anki no celular","Reviews de todos os decks, nos intervalos"],["p","À noite, se o PCA sair","Study Edge Exam 2 Review Part 1 (143 min, em 1.5–2x): começar o Exam 2"]],
+why:"Hoje é dia de compromisso, não de estudo. Na revisão presencial a professora mostra o tipo de questão que cai."},
+{id:"2026-12-03",wd:"qui",n:3,title:"WST + transcription + CHC",fixed:["Dra. Douma 10:45–11","Dr. D Discussion Hour 11–12 (Zoom)","Study Edge Exam 3 Review ao vivo 12pm (gravação até sex 10am)","CHC 5–6pm: você apresenta","PCA 8–9:30pm"],
+must:[["w","Rascunho do paper de WST","8:30–10:30, com o Claude no projeto da matéria"],["b","Horário com a Douma 10:45","Levar as dúvidas de biochem"],["b","Transcription: deck + questões","12–4: um deck só pras lectures de transcription + 10 questões"],["c","CHC: revisar e apresentar","Revisar os slides 30 min antes; apresentar às 5pm"],["b","Anki","Reviews de todos os decks + cards novos de transcription"]],
+bonus:[["b","Discussion Hour 11–12",""]],
+why:"Os slides do CHC ficaram prontos no fim de semana, então hoje é só revisar. A tarde vai pra transcription, que foi o que ficou mais confuso. A Exam 3 Review do Study Edge é hoje ao meio-dia, mas a gravação sai amanhã: você assiste segunda."},
+{id:"2026-12-04",wd:"sex",n:4,title:"Replication + Ch 13",fixed:["WST 9:35","GRMR: Darlin 4:30, Santiago 5:30"],
+must:[["b","D2–D4 Replication","Já assistiu: transcript simplificado + explicar em voz alta + deck + questões (D2 RNA e replication parte 1, D3 parte 2, D4 telomerase)"],["p","Study Edge Session 9 (Ch 13)","Vídeos Density and Pressure (17), Pascal's Principle (7), Flow Rate (9), Bernoulli's Equation (25), Archimedes' Principle (20), Poiseuille (11) → Ch 13 End of Packet Problems"],["b","Anki","Reviews de todos os decks + cards novos de D2–D4"]],
+bonus:[["p","HW 11","Problemas de fluidos"],["b","D1 DNA structure","Se não fez terça"]],
+why:"Replication ficou perto da prova porque você já assistiu: é só fixar. O Ch 13 é a única matéria do final que ainda não tem nada estudado."},
+{id:"2026-12-05",wd:"sáb",n:5,title:"Só questões de biochem",fixed:["Nada marcado"],
+must:[["b","Anki","Todos os decks: 11/16, 11/17, 11/18, 11/20, 30/nov, 1/dez, transcription, D1–D4"],["b","Practice questions por lecture","Common Misunderstandings (Module 10), Solved Problems, OC Quiz 11 e 12, questões do SI e do Claude. Refazer as erradas"],["b","SI Exam 4 Review","Gravação"],["b","Lista de erros","A que está no doc"]],
+bonus:[["p","1h: Study Edge Session 10 (Ch 14)","Só o Chapter 14 End of Packet Problems + Quiz. Pule os vídeos: você tirou 6/6 no Quiz 12"]],
+why:"No Exam 2 faltaram practice problems. Hoje é dia de questão, não de matéria nova."},
+{id:"2026-12-06",wd:"dom",n:6,title:"Simulado + fechar WST",fixed:["MOC Appreciation 11–1 (opcional)"],
+must:[["b","Practice Exam (extra credit)","Vale 5 pontos só por completar. Prazo seg 10h. Rever os erros"],["b","Quiz 13 de prática","Damage/repair, techniques, cancer"],["b","Central dogma + Chargaff","A primeira questão é sempre o slide do central dogma"],["b","Honorlock Practice Quiz","Testar a webcam externa"],["w","Fechar WST","Terminar o paper + escrever o post da apresentação"],["b","Anki","Todos os decks, só os cards que vencem hoje"]],
+bonus:[["p","1h: Study Edge Exam 3 Review","Gravação de quinta, a primeira hora, em 1.5–2x"]],
+why:"O simulado mostra o formato real da prova. Fechar WST hoje deixa segunda e terça só pras provas."},
+{id:"2026-12-07",wd:"seg",n:7,title:"Biochem Exam 4",exam:"BCH",fixed:["Sem aula (semana de provas)","BCH Exam 4 10h, Honorlock, janela até 12h"],
+must:[["b","Prova","50 questões em 90 min"],["w","Postar a apresentação de WST","Se não postou domingo"],["p","Study Edge Exam 3 Review","O que faltou da gravação, em 1.5–2x"],["p","Study Edge Mock Exam 3","17 questões como prova + vídeo de solução das que errar"]],
+bonus:[["p","Exam 3 Past Exam Video Solutions","As que der"]],
+why:"9 das 15 questões do final são do Ch 13–16. Depois da prova, 1h de descanso e a tarde é de physics."},
+{id:"2026-12-08",wd:"ter",n:8,title:"Physics final",exam:"PHY",fixed:["Physics final 12:30–2:30"],
+must:[["w","Entregar o paper de WST","Pronto desde domingo"],["p","Manhã: kinematics","Study Edge Session 2: \"1-D Kinematics\" (18) e \"2-D Kinematics (Projectile Motion)\" (26) + 3–4 problemas do seu Exam 1 + formula sheet"],["p","Prova",""],["p","À noite: Exam 2","Study Edge Exam 2 Review Part 1 (143 min, em 1.5–2x), se não viu quarta"]],
+bonus:[],
+why:"O Ch 1–5 vale só 3 questões, então a manhã é rápida. À noite já começa o Exam 2 de quinta."},
+{id:"2026-12-09",wd:"qua",n:9,title:"Treino pro Exam 2",fixed:["Sem aula (semana de provas)","MOC 1–4pm + 4:55–7pm","PCA 8pm: você pediu pra sair"],
+must:[["p","Study Edge Exam 2 Review Part 2","145 min, em 1.5–2x"],["p","Study Edge Mock Exam 2","22 questões como prova + vídeo de solução das que errar"]],
+bonus:[["p","À noite, se o PCA sair","Exam 2 da Canvas (Spring 19 e 23) + Exam 2 Past Exam Video Solutions"]],
+why:"O Exam 2 vale 25 pontos, igual ao final. Hoje só sobra a manhã, então ela vai inteira pra revisão e simulado."},
+{id:"2026-12-10",wd:"qui",n:10,title:"Physics Exam 2",exam:"PHY",fixed:["Exam 2 10h–12:30","MOC make-up 12:45","CHC 5–6pm","PCA 8–9:30pm"],
+must:[["p","Prova","Ch 6–10"]],bonus:[],
+why:"Última prova. Depois disso, só o GRMR na sexta."}
+];
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+let st={};try{st=JSON.parse(localStorage.getItem("pf-finals")||"{}")}catch(e){st={}}
+const save=()=>{try{localStorage.setItem("pf-finals",JSON.stringify(st))}catch(e){}};
+const areas=d=>[...new Set(d.must.map(t=>t[0]))];
+const doneN=d=>d.must.filter((t,i)=>st[d.id+":m"+i]).length;
+const taskLi=(d,t,k)=>`<li><label><input type="checkbox" id="${esc(d.id+'-'+k)}" data-k="${esc(d.id+':'+k)}" ${st[d.id+':'+k]?"checked":""}><span><span class="tag t-${t[0]}">${esc(t[1])}</span>${t[2]?" "+esc(t[2]):""}</span></label></li>`;
+const pad=x=>String(x).padStart(2,"0");
+const now=new Date();const key=now.getFullYear()+"-"+pad(now.getMonth()+1)+"-"+pad(now.getDate());
+let ti=D.findIndex(d=>d.id===key);if(ti<0)ti=key<D[0].id?0:D.length-1;
+const strip=document.getElementById("strip"),days=document.getElementById("days");
+const render=()=>{
+strip.innerHTML=D.map((d,i)=>`<button class="d${d.exam?" ex":""}${i===ti?" today":""}${doneN(d)===d.must.length?" done":""}" data-i="${i}" type="button" aria-label="${esc(d.wd+" "+d.n+": "+d.title)}">${d.exam?`<em>${esc(d.exam)}</em>`:""}<span>${esc(d.wd)}</span><b>${d.n}</b><span class="dots">${areas(d).map(a=>`<i class="i-${a}"></i>`).join("")}</span></button>`).join("");
+};
+days.innerHTML=D.map((d,i)=>`<article class="day${d.exam?" exam":""}${i===ti?" open":""}" id="day-${i}">
+<button class="hd" type="button" aria-expanded="${i===ti}"><span class="date"><b>${d.n}</b><small>${esc(d.wd)}</small></span><span class="tt"><strong>${esc(d.title)}</strong><ul class="mini">${d.must.map(t=>`<li><i class="i-${t[0]}"></i>${esc(t[1])}</li>`).join("")}</ul></span><span class="side"><span class="cnt" id="c-${i}"></span><span class="chev"><span class="o">abrir ▾</span><span class="c">fechar ▴</span></span></span></button>
+<div class="bd"><p class="why"><strong>Por que hoje</strong>${esc(d.why)}</p>
+<h3>Horários fixos</h3><ul class="fixed">${d.fixed.map(f=>`<li>${esc(f)}</li>`).join("")}</ul>
+<h3>Obrigatório</h3><ul class="tasks">${d.must.map((t,k)=>taskLi(d,t,"m"+k)).join("")}</ul>
+${d.bonus.length?`<h3>Bônus: se fizer, você é foda</h3><ul class="tasks">${d.bonus.map((t,k)=>taskLi(d,t,"b"+k)).join("")}</ul>`:""}</div></article>`).join("");
+const counts=()=>D.forEach((d,i)=>{const c=document.getElementById("c-"+i),n=doneN(d);c.textContent=n+"/"+d.must.length;c.classList.toggle("ok",n===d.must.length)});
+render();counts();
+const open=(i,go)=>{const a=document.getElementById("day-"+i);a.classList.add("open");a.querySelector(".hd").setAttribute("aria-expanded","true");if(go)a.scrollIntoView({behavior:matchMedia("(prefers-reduced-motion: reduce)").matches?"auto":"smooth",block:"start"})};
+days.addEventListener("click",e=>{const h=e.target.closest(".hd");if(!h)return;const a=h.parentElement;const o=a.classList.toggle("open");h.setAttribute("aria-expanded",String(o))});
+days.addEventListener("change",e=>{const k=e.target.dataset.k;if(!k)return;if(e.target.checked)st[k]=1;else delete st[k];save();counts();render()});
+strip.addEventListener("click",e=>{const b=e.target.closest(".d");if(b)open(+b.dataset.i,true)});
+document.getElementById("reset").addEventListener("click",()=>{st={};save();document.querySelectorAll(".tasks input").forEach(x=>x.checked=false);counts();render()});
+const tb=strip.children[ti];if(tb)tb.scrollIntoView({block:"nearest",inline:"center"});
+}
+</script>
+</body>
+</html>

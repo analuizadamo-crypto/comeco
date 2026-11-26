@@ -254,7 +254,12 @@ h3{font-size:1.25rem;margin:22px 0 10px}
 /* nav */
 nav{position:fixed;left:0;right:0;bottom:0;z-index:20;background:color-mix(in srgb,var(--bg) 88%,transparent);
   -webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom)}
-nav .in{max-width:540px;margin:0 auto;display:grid;grid-template-columns:repeat(4,1fr)}
+nav .in{max-width:540px;margin:0 auto;display:grid;grid-template-columns:repeat(5,1fr)}
+#finals{position:fixed;inset:0;z-index:200;background:#0b0b10;display:none}
+#finals.show{display:block}
+#finals .bar{position:absolute;top:0;left:0;right:0;height:calc(env(safe-area-inset-top) + 56px);padding:env(safe-area-inset-top) 12px 0;display:flex;align-items:center;justify-content:flex-end;background:#0b0b10;border-bottom:1px solid #2a2a36}
+#finals iframe{position:absolute;top:calc(env(safe-area-inset-top) + 56px);left:0;width:100%;height:calc(100% - env(safe-area-inset-top) - 56px);border:0;background:#0b0b10}
+#finals .x{min-height:44px;padding:8px 16px;border-radius:999px;background:#f3f1ec;color:#0b0b10;font-weight:700;font-size:.95rem}
 nav button{display:flex;flex-direction:column;align-items:center;gap:2px;padding:9px 0 8px;min-height:64px;font-size:.74rem;color:var(--muted);font-weight:600}
 nav button .e{font-size:1.4rem;filter:grayscale(.6);opacity:.75}
 nav button.on{color:var(--ink)}
@@ -351,7 +356,9 @@ details.help ol{padding-left:20px;margin:8px 0 0}
   <button data-a="nav" data-v="timers"><span class="e">⏱️</span>Timers</button>
   <button data-a="nav" data-v="review"><span class="e">🌙</span>Review</button>
   <button data-a="nav" data-v="week"><span class="e">🌿</span>Semana</button>
+  <button data-a="finalsOpen"><span class="e">📅</span>Finals</button>
 </div></nav>
+<div id="finals" role="dialog" aria-label="Calendário de Finals"><div class="bar"><button class="x" data-a="finalsClose">✕ Fechar</button></div></div>
 <div id="overlay"></div>
 <div id="sheet"></div>
 <div id="yay"></div>
@@ -1756,6 +1763,10 @@ const A = {
   yayTask: i => { $('#yay').classList.remove('show'); const [ti, si] = String(i).split('.');
     if (si != null) { stepDone(+ti, +si, true); return; }
     const d = day(dk()), t = d.tasks[+ti]; if (t) { t.done = true; t.pinned = false; save(); } render(); toast('Tarefa feita! 🐞'); },
+  /* 📅 Finals: finals.html inside the app (iframe), so the home-screen app stays open */
+  finalsOpen: () => { const f = $('#finals'); if (!f.querySelector('iframe')) { const fr = document.createElement('iframe'); fr.src = 'finals.html'; fr.title = 'Calendário de Finals'; f.appendChild(fr); }
+    f.classList.add('show'); document.body.style.overflow = 'hidden'; },
+  finalsClose: () => { $('#finals').classList.remove('show'); document.body.style.overflow = ''; },
   yayGo: () => { $('#yay').classList.remove('show'); ui.view = 'home'; render(); if (ui.card) A.go(); },
   /* steps */
   scheck: (v, el) => { const [ti, si] = v.split('.').map(Number), t = day(dk()).tasks[ti], st = t && (t.steps || [])[si]; if (!st) return;
