@@ -513,6 +513,27 @@ async function addPhotos(files){
 }
 const photoOfDay = () => PH.length ? PH[dayOfYear() % PH.length] : null;
 
+/* ==================== 📅 Finals: finals.html is the source of truth during finals ==================== */
+let FIN = [];
+const FIN_AREA = {b:['bch','Biochem'], p:['phy','Physics'], c:['', 'CHC'], w:['', 'WST'], o:['', 'Outros']};
+const FIN_COLOR = {b:'#ff6b9a', p:'#5ec8ff', c:'#ff9a62', w:'#c6a8ff', o:'#9aa0a6'};
+async function loadFinals(){
+  try { const r = await fetch('finals.html'); const txt = await r.text(); const m = txt.match(/const D=(\[[\s\S]*?\n\]);/);
+    if (m) { FIN = new Function('return ' + m[1])(); safeRender(); } } catch(e) {}
+}
+const finDay = k => FIN.find(d => d.id === k) || null;
+const finSt = () => { try { return JSON.parse(localStorage.getItem('pf-finals') || '{}') || {}; } catch(e) { return {}; } };
+function finSet(key, on){ const st = finSt(); if (on) st[key] = 1; else delete st[key]; try { localStorage.setItem('pf-finals', JSON.stringify(st)); } catch(e) {} }
+const finMode = () => !!finDay(dk());
+function vFinDay(d){
+  const st = finSt(), li = (t, key) => `<div class="task ${st[d.id + ':' + key] ? 'done' : ''}"><button class="check" data-a="finCheck" data-v="${esc(d.id + ':' + key)}" aria-label="Feito">${st[d.id + ':' + key] ? '✓' : ''}</button>
+    <span class="tx"><i style="display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px;background:${FIN_COLOR[t[0]] || 'var(--muted)'}"></i><b>${esc(t[1])}</b>${t[2] ? `<br><span class="muted small">${esc(t[2])}</span>` : ''}</span></div>`;
+  return `<p class="small" style="margin:0 0 8px"><b>Por que hoje:</b> ${esc(d.why)}</p>
+    ${d.fixed.length ? `<p class="muted small" style="margin:0 0 6px">🕐 ${d.fixed.map(esc).join(' · ')}</p>` : ''}
+    <p class="small" style="margin:10px 0 0"><b>Obrigatório</b></p>${d.must.map((t, i) => li(t, 'm' + i)).join('')}
+    ${d.bonus.length ? `<p class="small" style="margin:12px 0 0"><b>Bônus: se fizer, você é foda</b></p>${d.bonus.map((t, i) => li(t, 'b' + i)).join('')}` : ''}
+    <button class="btn ghost wide" data-a="finalsOpen">📅 Abrir o calendário completo</button>`;
+}
 const ui = { view:'home', open:{}, wOff:0, wmode:'week', focusMin:false, sheet:null, addSubj:null, addDay:'today', card:null };
 
 /* ==================== data helpers ==================== */
@@ -749,6 +770,7 @@ const ankiDay = k => peek(k).anki === true || !!(peek(k).cl || {}).anki;
 function noteNow(){
   const k = dk(), h = new Date().getHours(), d = peek(k), dis = d.dis || {}, cl = d.cl || {}, wd = parseYmd(k).getDay(), N = [];
   const push = (id, t) => { if (!dis[id]) N.push({id, t}); };
+  if (finDay(k)) return null; // during finals the 📅 plan says it all
   if ((k === '2026-11-18' || k === '2026-11-19') && h >= 17) push('lab-eve', '🔬 Amanhã: makeup lab 1:55 PM (chegar 1:45) · NPB 1213/1219/1221');
   if ((k === '2026-11-19' || k === '2026-11-20') && h < 14) push('lab-day', '🔬 Hoje: makeup lab 1:55 PM — chegar 1:45 · NPB 1213/1219/1221');
   if (!S.cx.done['bch-pe4'] && (k === '2026-12-05' || k === '2026-12-06' || (k === '2026-12-07' && h < 10))) push('pe4', '⏰ Practice Exam 4 (+5) até segunda 10 AM — não deixa passar!');
@@ -833,7 +855,7 @@ function nextAction(){
       return {subj:sid('bch'), title:'BCH Quiz 10', why:'Até 11:59 PM hoje · 25 min · Honorlock. Depois, volta pra física.', task:'BCH Quiz 10', dlId:'bch-q10'};
     return {subj:sid('phy'), title:'Physics: problemas', why:`Exam 2 makeup ${countdown({s:mk, allDay:false})} · ${nextPhyTopic() ? 'próximo tipo: ' + nextPhyTopic() + ' · ' : ''}1 guiado + 1 sozinha — problemas, não leitura.`};
   }
-  if (today === '2026-11-26') return {subj:sid('phy'), title:'Dia de folga 🦃', why:'Thanksgiving. Hoje não tem estudo — descansa de verdade. Amanhã o catch-up continua.', info:true};
+  if (today === '2026-11-26' && !finDay(today)) return {subj:sid('phy'), title:'Dia de folga 🦃', why:'Thanksgiving. Hoje não tem estudo — descansa de verdade. Amanhã o catch-up continua.', info:true};
   // 1. her choice: the pinned task, or the first one with steps → its next tiny step
   const open = tasksOf(today).filter(t => !t.done);
   const ch = open.find(t => t.pinned) || open.find(t => (t.steps || []).some(x => !x.done));
@@ -842,6 +864,14 @@ function nextAction(){
       return {subj: st.prep && hasPrep() ? 'prep' : matchSubj(ch.t) || matchSubj(st.t) || fallbackSubj(), title: st.t, task: st.t, taskI: `${ch.i}.${si}`, stepMin: st.min,
         why: `${ch.pinned ? '📌 ' : ''}${ch.t} · passo ${si + 1} de ${sts.length} · ${st.prep ? '🛠️ prep' : ptsTxt(stepPts(st))}`}; } }
   const pinned = open.find(t => t.pinned);
+  const fdn = finDay(today);
+  if (fdn && !pinned) { const st = finSt(), i = fdn.must.findIndex((t, j) => !st[fdn.id + ':m' + j]);
+    if (i >= 0) { const t = fdn.must[i], ar = FIN_AREA[t[0]] || ['', ''];
+      return {subj: ar[0] ? sid(ar[0]) : matchSubj(t[1]) || fallbackSubj(), title: t[1], why: `📅 ${fdn.title} · obrigatório ${i + 1} de ${fdn.must.length}${t[2] ? ' · ' + t[2] : ''}`, task: t[1], finKey: `${fdn.id}:m${i}`}; }
+    const bi = fdn.bonus.findIndex((t, j) => !st[fdn.id + ':b' + j]);
+    if (bi >= 0) { const t = fdn.bonus[bi], ar = FIN_AREA[t[0]] || ['', ''];
+      return {subj: ar[0] ? sid(ar[0]) : matchSubj(t[1]) || fallbackSubj(), title: t[1], why: `✨ Obrigatório feito, o dia contou! Bônus: se fizer, você é foda${t[2] ? ' · ' + t[2] : ''}`, task: t[1], finKey: `${fdn.id}:b${bi}`}; }
+    return {subj: fallbackSubj(), title: 'O dia contou 🐞', why: 'Obrigatório e bônus feitos. Descansa — amanhã o calendário te diz o próximo.', info:true}; }
   if (pinned) return {subj: matchSubj(pinned.t) || fallbackSubj(), title: pinned.t, why: '📌 Sua tarefa fixada de hoje', task: pinned.t, taskI: pinned.i};
   // 2. exam in next 7 days
   const dls = deadlines(7);
@@ -878,6 +908,12 @@ function nextAction(){
 function attackPlan(){
   const k = dk(), out = [], have = new Set(tasksOf(k).map(t => t.t));
   const add = (t, why, steps) => { if (!have.has(t) && !out.some(o => o.t === t)) out.push({t, why, steps: steps.map(([x, m, pr]) => ({t:x, min:m, prep:!!pr}))}); };
+  const fd = finDay(k);
+  if (fd) { const st = finSt(); /* during finals: the plan IS today's finals card, in its order */
+    const addF = (key, ...a) => { const n = out.length; add(...a); if (out.length > n) out[n].fin = key; };
+    fd.must.forEach((t, i) => { if (!st[fd.id + ':m' + i]) addF(fd.id + ':m' + i, t[1], `📅 obrigatório${FIN_AREA[t[0]] ? ' · ' + FIN_AREA[t[0]][1] : ''}${t[2] ? ' · ' + t[2] : ''}`, []); });
+    if (!out.length) fd.bonus.forEach((t, i) => { if (!st[fd.id + ':b' + i]) addF(fd.id + ':b' + i, t[1], `✨ bônus${t[2] ? ' · ' + t[2] : ''}`, []); });
+    return out; }
   if (k === '2026-11-26') return out;
   // 1. due in the next 2 days
   for (const e of deadlines(2).filter(e => !e.exam && e.kind !== 'event')) {
@@ -1054,10 +1090,13 @@ function vHome(){
   html += fold('tasks', "✅ Today's 3", tk.length ? `${done}/${tk.length}${exL.length ? ` + ${exL.filter(t => t.done).length}/${exL.length}` : ''}${dp ? ` · ⭐ ${ptsTxt(dp)}` : ''}` : 'vazio', vTasks());
   const wl = S.wait.length, wf = S.wait.filter(waitFlag).length;
   if (wl) html += fold('wait', '📦 Esperando', `${wl}${wf ? ` · 🚩${wf}` : ''}`, vWait());
-  const ci = classItems(today);
+  const fd = finDay(today);
+  if (fd) { const st = finSt(), n = fd.must.filter((t, i) => st[fd.id + ':m' + i]).length; if (ui.open.fin === undefined) ui.open.fin = true;
+    html += fold('fin', `📅 Finals hoje · ${esc(fd.title)}`, `${n}/${fd.must.length}`, vFinDay(fd)); }
+  const ci = fd ? [] : classItems(today);
   if (ci.length) html += fold('class', '📝 Hoje nas aulas', `${ci.filter(i => clDone(today, i.id)).length}/${ci.length}`, vClass(today, ci));
-  if (today <= '2026-12-07') html += fold('lecs', '🧬 BCH Exam 4', `${BCH_LECS.filter(x => !S.cx.lec[x]).length} faltam`, vLecs());
-  if (today <= '2026-12-10') html += phyExamMode()
+  if (!fd && today <= '2026-12-07') html += fold('lecs', '🧬 BCH Exam 4', `${BCH_LECS.filter(x => !S.cx.lec[x]).length} faltam`, vLecs());
+  if (!fd && today <= '2026-12-10') html += phyExamMode()
     ? fold('phy', '🧲 PHY Exam 2', `${PHY_TOPICS.filter(([id]) => S.cx.phyT[id]).length}/6 dominados`, vPhy())
     : fold('phy', '🧲 PHY catch-up · até 10/12', (([l, h]) => `${l} aulas · ${h} HW`)(phyLeft()), vPhy());
   const dls = deadlines(14);
@@ -1094,7 +1133,7 @@ function cardNow(){
   }
   if (a.stepMin) { plan = a.stepMin; dur = f.cur ? `Agora: ${esc(f.curTitle)} até ${clock(f.cur.e)}. Depois: ${plan} min.` : `${plan} min · um passo de cada vez`; }
   else if (a.cap && plan > a.cap) { plan = a.cap; dur = f.cur ? `Agora: ${esc(f.curTitle)} até ${clock(f.cur.e)}. Depois: ${plan} min leves.` : `${plan} min leves · livre até ${clock(f.to)}`; }
-  ui.card = {subj: a.subj, plan, task: a.task || '', taskI: a.taskI};
+  ui.card = {subj: a.subj, plan, task: a.task || '', taskI: a.finKey ? 'f:' + a.finKey : a.taskI};
   const title = a.task ? esc(a.title) : `${s.emoji} ${esc(a.title)}`;
   return `<button class="now" data-a="go">${mandalaSVG()}<span class="lbl">${lbl}</span><span class="big">${title}</span>
     <span class="whyline">${esc(a.why)}</span><span class="dur">⏱ ${dur}</span><span class="cta">▶ Começar · ${plan} min</span></button>`;
@@ -1153,10 +1192,10 @@ function vTasks(){
 function vPlan(){
   const k = dk(), tk = tasksOf(k), room = 3 - tk.length, pl = attackPlan(), pb = prepBudget(k), left = Math.max(0, pb.min - prepDone(k));
   let html = `<p class="muted small" style="margin:0 0 4px">Minhas sugestões, em ordem de importância. Você escolhe — pode mudar tudo.</p>`;
-  if (!pl.length) html += `<p class="muted">${k === '2026-11-26' ? 'Hoje é folga 🦃 Nada de plano.' : 'Nada urgente agora 🌿 Escolhe o que fizer sentido.'}</p>`;
-  html += pl.slice(0, 4).map((p, i) => { const tot = p.steps.reduce((a, x) => a + (x.prep ? 0 : ptsOf(x.min)), 0), mins = p.steps.reduce((a, x) => a + x.min, 0);
-    return `<div class="plan"><h4>${i + 1}. ${esc(p.t)}</h4><p class="why">${esc(p.why)} · ${fmtMin(mins)} · ⭐ ${ptsTxt(tot)}</p>
-      <ol>${p.steps.map(x => `<li>${esc(x.t)} <span class="muted small">(${x.min}′${x.prep ? ' · prep' : ` · ${ptsTxt(ptsOf(x.min))}`})</span></li>`).join('')}</ol>
+  if (!pl.length) html += `<p class="muted">${finDay(k) ? 'Obrigatório de hoje feito! 🐞 O dia contou.' : k === '2026-11-26' ? 'Hoje é folga 🦃 Nada de plano.' : 'Nada urgente agora 🌿 Escolhe o que fizer sentido.'}</p>`;
+  html += pl.slice(0, finMode() ? 8 : 4).map((p, i) => { const tot = p.steps.reduce((a, x) => a + (x.prep ? 0 : ptsOf(x.min)), 0), mins = p.steps.reduce((a, x) => a + x.min, 0);
+    return `<div class="plan"><h4>${i + 1}. ${esc(p.t)}</h4><p class="why">${esc(p.why)}${p.steps.length ? ` · ${fmtMin(mins)} · ⭐ ${ptsTxt(tot)}` : ''}</p>
+      ${p.steps.length ? '' : '<p class="muted small" style="margin:0 0 8px">Você escreve os passos pequenos depois de usar.</p>'}<ol>${p.steps.map(x => `<li>${esc(x.t)} <span class="muted small">(${x.min}′${x.prep ? ' · prep' : ` · ${ptsTxt(ptsOf(x.min))}`})</span></li>`).join('')}</ol>
       ${room > 0 ? `<button class="btn ghost" style="min-height:44px" data-a="planUse" data-v="${i}">＋ Usar no Today's 3</button>` : ''}</div>`; }).join('');
   if (room <= 0 && pl.length) html += `<p class="muted small">Today's 3 está cheio. Pra trocar, desmarca ou apaga uma.</p>`;
   html += `<div class="row" style="margin-top:10px;flex-wrap:wrap"><button class="btn" data-a="planTimer">⏱ Planejar · ${Math.min(10, left) || 5} min</button>
@@ -1573,7 +1612,7 @@ function finishTimer(silent){
       celebrate(`🛠️ ${fmtMin(min)} de prep`, pd <= pb ? `Prep hoje: ${fmtMin(pd)} de ${fmtMin(pb)}. Agora, chega de planejar.` : `Prep passou ${fmtMin(pd - pb)} do limite — isso desconta do estudo. Bora fazer de verdade 💛`,
         `<button class="btn green wide" data-a="yayGo">▶ Agora: começar o 1º passo</button>`);
     } else if (min >= 1) {
-      const taskBtn = (t.task && t.taskI != null) ? `<button class="btn green wide" data-a="yayTask" data-v="${t.taskI}">✓ Marcar “${esc(t.task)}” como feit${String(t.taskI).includes('.') ? 'o' : 'a'}</button>` : '';
+      const taskBtn = (t.task && t.taskI != null) ? `<button class="btn green wide" data-a="yayTask" data-v="${t.taskI}">✓ Marcar “${esc(t.task)}” como feit${String(t.taskI).includes('.') || String(t.taskI).startsWith('f:') ? 'o' : 'a'}</button>` : '';
       celebrate(`Bom trabalho! ${fmtMin(min)} de ${esc(s.name)}`, sessionNote(), taskBtn);
     } else toast('Tudo bem — recomeçar também conta. 💛');
   }
@@ -1716,7 +1755,7 @@ const A = {
       S.brk = {until: Date.now() + S.settings.brk*6e4, subj: id}; if (S.settings.ring) S.brk.alarmId = addAlarm(S.settings.brk, 'Fim da pausa ☕', 'break'); save(); render(); toast('Bloco salvo ✓ Agora, pausa.'); } },
   brkBack: () => { const id = S.brk ? S.brk.subj : S.lastSubj; if (S.brk && S.brk.alarmId) removeAlarm(S.brk.alarmId); S.brk = null; startTimer(id, S.settings.block); },
   brkEnd: () => { if (S.brk && S.brk.alarmId) removeAlarm(S.brk.alarmId); S.brk = null; save(); render(); celebrate('Bom trabalho! 🐞', sessionNote()); },
-  tcheck: (i, el) => { const d = day(dk()), t = d.tasks[+i]; if (!t) return; t.done = !t.done; if (t.done) { t.pinned = false; const r = el.getBoundingClientRect(); flyBug(r.left + 3, r.top);
+  tcheck: (i, el) => { const d = day(dk()), t = d.tasks[+i]; if (!t) return; t.done = !t.done; if (t.fin) finSet(t.fin, t.done); if (t.done) { t.pinned = false; const r = el.getBoundingClientRect(); flyBug(r.left + 3, r.top);
     const tk = tasksOf(dk()); toast(tk.length >= 3 && tk.every(x => x.done) ? '3 prioridades feitas! ✨ “Também quero fazer” liberado' : 'Feito! 🐞'); } save(); render(); },
   tpin: i => { const d = day(dk()); d.tasks.forEach((t, j) => t.pinned = j === +i ? !t.pinned : false); save(); render(); },
   taskAdd: () => { const inp = $('#newTask'); const v = (inp && inp.value || '').trim(); if (!v) { inp && inp.focus(); return; }
@@ -1760,13 +1799,17 @@ const A = {
   addPhotos: () => { const f = $('#photoFile'); f.value = ''; f.click(); },
   delPhoto: async id => { if (!confirm('Remover esta foto do mood board?')) return; try { await IDB.del(id); } catch(e) {} PH = PH.filter(p => p.id !== id); render(); },
   yayClose: () => { $('#yay').classList.remove('show'); },
-  yayTask: i => { $('#yay').classList.remove('show'); const [ti, si] = String(i).split('.');
+  yayTask: i => { $('#yay').classList.remove('show'); if (String(i).startsWith('f:')) { finSet(String(i).slice(2), true); render(); toast('Feito! 🐞'); return; }
+    const [ti, si] = String(i).split('.');
     if (si != null) { stepDone(+ti, +si, true); return; }
-    const d = day(dk()), t = d.tasks[+ti]; if (t) { t.done = true; t.pinned = false; save(); } render(); toast('Tarefa feita! 🐞'); },
+    const d = day(dk()), t = d.tasks[+ti]; if (t) { t.done = true; t.pinned = false; if (t.fin) finSet(t.fin, true); save(); } render(); toast('Tarefa feita! 🐞'); },
   /* 📅 Finals: finals.html inside the app (iframe), so the home-screen app stays open */
   finalsOpen: () => { const f = $('#finals'); if (!f.querySelector('iframe')) { const fr = document.createElement('iframe'); fr.src = 'finals.html'; fr.title = 'Calendário de Finals'; f.appendChild(fr); }
     f.classList.add('show'); document.body.style.overflow = 'hidden'; },
-  finalsClose: () => { $('#finals').classList.remove('show'); document.body.style.overflow = ''; },
+  finalsClose: () => { $('#finals').classList.remove('show'); document.body.style.overflow = ''; render(); },
+  finCheck: (v, el) => { const on = !finSt()[v]; finSet(v, on); if (on) { const r = el.getBoundingClientRect(); flyBug(r.left + 3, r.top); }
+    const fr = $('#finals iframe'); if (fr) fr.remove(); /* reload the calendar next time so it shows the same boxes */
+    render(); if (on) toast('Feito! 🐞'); },
   yayGo: () => { $('#yay').classList.remove('show'); ui.view = 'home'; render(); if (ui.card) A.go(); },
   /* steps */
   scheck: (v, el) => { const [ti, si] = v.split('.').map(Number), t = day(dk()).tasks[ti], st = t && (t.steps || [])[si]; if (!st) return;
@@ -1787,7 +1830,7 @@ const A = {
   planUse: v => { const p = attackPlan()[+v]; if (!p) return; const d = day(dk()); d.tasks = d.tasks.filter(t => (t.t || '').trim());
     if (d.tasks.length >= 3) { toast('Só 3 por dia — menos é mais 💛'); return; }
     const w = S.wait.find(x => x.t === p.t);
-    d.tasks.push({t:p.t, done:false, pinned:false, steps:clone(p.steps), ...(w ? {from:w.since, since:w.since} : {})});
+    d.tasks.push({t:p.t, done:false, pinned:false, steps:clone(p.steps), ...(w ? {from:w.since, since:w.since} : {}), ...(p.fin ? {fin:p.fin} : {})});
     if (w) S.wait = S.wait.filter(x => x !== w);
     ui.open.tasks = true; save(); render(); toast(`＋ ${p.t}`); },
   planTimer: () => { if (!hasPrep()) { toast('Adiciona “Prep” em ⚙️ Matérias pra contar o tempo de planejar'); return; }
@@ -1813,7 +1856,7 @@ const A = {
 function stepDone(ti, si, on){
   const t = day(dk()).tasks[ti], st = t && (t.steps || [])[si]; if (!st) return;
   st.done = on;
-  if (on && t.steps.every(x => x.done) && !t.done) { t.done = true; t.pinned = false; save(); render();
+  if (on && t.steps.every(x => x.done) && !t.done) { t.done = true; t.pinned = false; if (t.fin) finSet(t.fin, true); save(); render();
     const tk = tasksOf(dk()); toast(tk.length >= 3 && tk.every(x => x.done) ? '3 prioridades feitas! ✨' : `“${t.t}” feita! 🐞 +${ptsTxt(taskPts(t).all)}`); return; }
   save(); render(); if (on) toast(st.prep ? 'Prep feito 🛠️' : `+${ptsTxt(stepPts(st))} ⭐`);
 }
@@ -1883,6 +1926,7 @@ document.addEventListener('pointerdown', () => { if (!AC && S.alarms.length) { u
 S.alarms = S.alarms.filter(a => !(a.rung && Date.now() - a.rung > 30*6e4) && !(!a.rung && Date.now() - a.end > 30*6e4));
 fetchCal(false);
 loadPhotos().then(() => { if (PH.length) safeRender(); });
+loadFinals();
 if ('serviceWorker' in navigator && location.protocol === 'https:') {
   window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
 }

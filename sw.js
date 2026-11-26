@@ -1,5 +1,5 @@
 // Começo service worker — makes the app open offline. Bump VERSION when you change index.html.
-const VERSION = 'comeco-v13';
+const VERSION = 'comeco-v14';
 const CORE = ['./', './index.html', './manifest.webmanifest', './apple-touch-icon.png', './icon-192.png', './icon-512.png', './finals.html'];
 
 self.addEventListener('install', e => {
