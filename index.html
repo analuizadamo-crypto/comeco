@@ -254,12 +254,9 @@ h3{font-size:1.25rem;margin:22px 0 10px}
 /* nav */
 nav{position:fixed;left:0;right:0;bottom:0;z-index:20;background:color-mix(in srgb,var(--bg) 88%,transparent);
   -webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom)}
-nav .in{max-width:540px;margin:0 auto;display:grid;grid-template-columns:repeat(5,1fr)}
-#finals{position:fixed;inset:0;z-index:200;background:#0b0b10;display:none}
-#finals.show{display:block}
-#finals .bar{position:absolute;top:0;left:0;right:0;height:calc(env(safe-area-inset-top) + 56px);padding:env(safe-area-inset-top) 12px 0;display:flex;align-items:center;justify-content:flex-end;background:#0b0b10;border-bottom:1px solid #2a2a36}
-#finals iframe{position:absolute;top:calc(env(safe-area-inset-top) + 56px);left:0;width:100%;height:calc(100% - env(safe-area-inset-top) - 56px);border:0;background:#0b0b10}
-#finals .x{min-height:44px;padding:8px 16px;border-radius:999px;background:#f3f1ec;color:#0b0b10;font-weight:700;font-size:.95rem}
+nav .in{max-width:540px;margin:0 auto;display:grid;grid-template-columns:repeat(4,1fr)}
+#finWrap{margin:14px 0;border-radius:22px;overflow:hidden;background:#0b0b10}
+#finWrap iframe{display:block;width:100%;border:0;height:1600px;background:#0b0b10}
 nav button{display:flex;flex-direction:column;align-items:center;gap:2px;padding:9px 0 8px;min-height:64px;font-size:.74rem;color:var(--muted);font-weight:600}
 nav button .e{font-size:1.4rem;filter:grayscale(.6);opacity:.75}
 nav button.on{color:var(--ink)}
@@ -350,15 +347,15 @@ details.help ol{padding-left:20px;margin:8px 0 0}
     <button class="iconbtn" data-a="settings" aria-label="Ajustes">⚙️</button>
   </div></header>
   <main id="view"></main>
+  <div id="finWrap"></div>
+  <div id="viewB"></div>
 </div>
 <nav><div class="in">
   <button data-a="nav" data-v="home"><span class="e">☀️</span>Começar</button>
   <button data-a="nav" data-v="timers"><span class="e">⏱️</span>Timers</button>
   <button data-a="nav" data-v="review"><span class="e">🌙</span>Review</button>
   <button data-a="nav" data-v="week"><span class="e">🌿</span>Semana</button>
-  <button data-a="finalsOpen"><span class="e">📅</span>Finals</button>
 </div></nav>
-<div id="finals" role="dialog" aria-label="Calendário de Finals"><div class="bar"><button class="x" data-a="finalsClose">✕ Fechar</button></div></div>
 <div id="overlay"></div>
 <div id="sheet"></div>
 <div id="yay"></div>
@@ -1058,49 +1055,25 @@ function vHome(){
   const [qt, qa] = QUOTES[dayOfYear() % QUOTES.length].split(' — ');
   let html = `<section class="hello"><h1>${greet}${st.name ? ', ' + esc(st.name) : ''} ${icon}</h1><p class="date">${date}</p>
     <div class="page"><p class="quote"><mark>"${esc(qt)}"</mark>${qa ? `<span class="qa">— ${esc(qa)}</span>` : ''}</p></div><p class="why">♡ lembra do porquê · ${esc(st.why)}</p></section>`;
-  html += cardNow();
-  const la = ui.lastA;
-  if (la && la.dlId) html += `<div class="pills"><button class="pill" data-a="dlDone" data-v="${la.dlId}">✓ ${esc(la.title)} feito</button></div>`;
-  const nt = noteNow();
-  if (nt) html += `<div class="note"><span>${esc(nt.t)}</span><button data-a="noteX" data-v="${nt.id}" aria-label="Esconder por hoje">✕</button></div>`;
-
+  ui.lastA = null;
   const pills = [];
   if (h >= 19 && !peek(today).reviewed) pills.push(`<button class="pill moon" data-a="nav" data-v="review">🌙 Review de 2 min</button>`);
-  const T = totals(), sk = streak(tests(T).study);
-  if (sk >= 2) pills.push(`<span class="pill">🐞 ${sk} dias seguidos estudando</span>`);
-  const pd = hasPrep() ? prepDone(today, T) : 0, pb = prepBudget(today).min;
-  if (pd > 0) pills.push(pd <= pb ? `<span class="pill">🛠️ prep ${fmtMin(pd)} de ${fmtMin(pb)}</span>`
-    : `<span class="pill" style="border-color:var(--red);color:var(--red)">🛠️ prep passou ${fmtMin(pd - pb)} · −${fmtMin(pd - pb)} do estudo</span>`);
   const nextAl = S.alarms.filter(a => !a.rung && a.kind === 'timer').sort((a, b) => a.end - b.end)[0];
   if (nextAl) pills.unshift(`<button class="pill moon" data-a="nav" data-v="timers">⏰ <span class="altime" data-al="${nextAl.id}">${fmtT(nextAl.end - Date.now())}</span></button>`);
+  if (S.timer || S.brk) pills.unshift(`<button class="pill moon" data-a="openFocus">▶ timer rodando · <span data-tick="${S.timer ? 'run' : 'brk'}"></span></button>`);
   if (pills.length) html += `<div class="pills">${pills.join('')}</div>`;
 
   const ph = photoOfDay();
   if (ph) html += `<button class="photo" data-a="gallery" aria-label="Abrir mood board"><img src="${ph.data}" alt=""><span class="cap">🖼️ foto do dia</span></button>`;
   else html += `<div class="pills"><button class="pill" data-a="settingsMood">🖼️ Adicionar fotos do mood board</button></div>`;
 
-  // collapsed sections
-  const tev = todayEvents();
-  html += fold('cal', '🗓️ Hoje no calendário', st.calUrl ? `${tev.length} evento${tev.length===1?'':'s'}` : 'conectar', vTimeline());
-  const tk = tasksOf(today), done = tk.filter(t => t.done).length;
-  const exL = peek(today).extra || [];
-  if (tk.length < 3 && ui.open.plan === undefined) ui.open.plan = true;
-  html += fold('plan', '🎯 Plano de ataque', tk.length >= 3 ? 'hoje já tem 3 ✓' : 'sugestões', vPlan());
-  const dp = dayPts(today);
-  html += fold('tasks', "✅ Today's 3", tk.length ? `${done}/${tk.length}${exL.length ? ` + ${exL.filter(t => t.done).length}/${exL.length}` : ''}${dp ? ` · ⭐ ${ptsTxt(dp)}` : ''}` : 'vazio', vTasks());
-  const wl = S.wait.length, wf = S.wait.filter(waitFlag).length;
-  if (wl) html += fold('wait', '📦 Esperando', `${wl}${wf ? ` · 🚩${wf}` : ''}`, vWait());
-  const fd = finDay(today);
-  if (fd) { const st = finSt(), n = fd.must.filter((t, i) => st[fd.id + ':m' + i]).length; if (ui.open.fin === undefined) ui.open.fin = true;
-    html += fold('fin', `📅 Finals hoje · ${esc(fd.title)}`, `${n}/${fd.must.length}`, vFinDay(fd)); }
-  const ci = fd ? [] : classItems(today);
-  if (ci.length) html += fold('class', '📝 Hoje nas aulas', `${ci.filter(i => clDone(today, i.id)).length}/${ci.length}`, vClass(today, ci));
-  if (!fd && today <= '2026-12-07') html += fold('lecs', '🧬 BCH Exam 4', `${BCH_LECS.filter(x => !S.cx.lec[x]).length} faltam`, vLecs());
-  if (!fd && today <= '2026-12-10') html += phyExamMode()
-    ? fold('phy', '🧲 PHY Exam 2', `${PHY_TOPICS.filter(([id]) => S.cx.phyT[id]).length}/6 dominados`, vPhy())
-    : fold('phy', '🧲 PHY catch-up · até 10/12', (([l, h]) => `${l} aulas · ${h} HW`)(phyLeft()), vPhy());
-  const dls = deadlines(14);
-  html += fold('dl', '⏳ Próximos prazos', dls.length ? `${dls.length}` : '—', vDeadlines(dls));
+  return html;
+}
+/* the folds under the finals calendar (home only) */
+function vHomeB(){
+  const st = S.settings, tev = todayEvents(), dls = deadlines(14);
+  return fold('cal', '🗓️ Hoje no calendário', st.calUrl ? `${tev.length} evento${tev.length===1?'':'s'}` : 'conectar', vTimeline())
+    + fold('dl', '⏳ Próximos prazos', dls.length ? `${dls.length}` : '—', vDeadlines(dls));
   return html;
 }
 
@@ -1485,6 +1458,8 @@ function render(){
   carryOver();
   const v = ui.view;
   $('#view').innerHTML = v === 'timers' ? vTimers() : v === 'review' ? vReview() : v === 'week' ? vWeek() : vHome();
+  $('#viewB').innerHTML = v === 'home' ? vHomeB() : '';
+  $('#finWrap').hidden = v !== 'home';
   document.querySelectorAll('nav button').forEach(b => b.classList.toggle('on', b.dataset.v === v));
   $('#overlay').innerHTML = vFocus();
   updateRing();
@@ -1803,13 +1778,6 @@ const A = {
     const [ti, si] = String(i).split('.');
     if (si != null) { stepDone(+ti, +si, true); return; }
     const d = day(dk()), t = d.tasks[+ti]; if (t) { t.done = true; t.pinned = false; if (t.fin) finSet(t.fin, true); save(); } render(); toast('Tarefa feita! 🐞'); },
-  /* 📅 Finals: finals.html inside the app (iframe), so the home-screen app stays open */
-  finalsOpen: () => { const f = $('#finals'); if (!f.querySelector('iframe')) { const fr = document.createElement('iframe'); fr.src = 'finals.html'; fr.title = 'Calendário de Finals'; f.appendChild(fr); }
-    f.classList.add('show'); document.body.style.overflow = 'hidden'; },
-  finalsClose: () => { $('#finals').classList.remove('show'); document.body.style.overflow = ''; render(); },
-  finCheck: (v, el) => { const on = !finSt()[v]; finSet(v, on); if (on) { const r = el.getBoundingClientRect(); flyBug(r.left + 3, r.top); }
-    const fr = $('#finals iframe'); if (fr) fr.remove(); /* reload the calendar next time so it shows the same boxes */
-    render(); if (on) toast('Feito! 🐞'); },
   yayGo: () => { $('#yay').classList.remove('show'); ui.view = 'home'; render(); if (ui.card) A.go(); },
   /* steps */
   scheck: (v, el) => { const [ti, si] = v.split('.').map(Number), t = day(dk()).tasks[ti], st = t && (t.steps || [])[si]; if (!st) return;
@@ -1926,7 +1894,19 @@ document.addEventListener('pointerdown', () => { if (!AC && S.alarms.length) { u
 S.alarms = S.alarms.filter(a => !(a.rung && Date.now() - a.rung > 30*6e4) && !(!a.rung && Date.now() - a.end > 30*6e4));
 fetchCal(false);
 loadPhotos().then(() => { if (PH.length) safeRender(); });
-loadFinals();
+/* 📅 the finals calendar, exactly as made: finals.html in a frame that grows to its full height */
+(function mountFinals(){
+  const wrap = $('#finWrap'), fr = document.createElement('iframe');
+  fr.src = 'finals.html'; fr.title = 'Calendário de Finals'; fr.setAttribute('scrolling', 'no');
+  const fit = () => { try { const d = fr.contentDocument; if (d && d.body) fr.style.height = Math.ceil(d.documentElement.scrollHeight) + 'px'; } catch(e) {} };
+  const y0 = window.scrollY;
+  fr.addEventListener('load', () => {
+    window.scrollTo(0, y0);                    // the calendar centers today's day on load; don't let that move this page
+    fit(); try { new ResizeObserver(fit).observe(fr.contentDocument.body); } catch(e) {}
+    setTimeout(fit, 300);
+  });
+  wrap.appendChild(fr);
+})();
 if ('serviceWorker' in navigator && location.protocol === 'https:') {
   window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
 }
