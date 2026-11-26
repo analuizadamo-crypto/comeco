@@ -1474,7 +1474,14 @@ function safeRender(){
   if (ui.sheet === 'settings') return;
   render();
 }
+function finTheme(){
+  const fr = $('#finWrap iframe'), d = fr && fr.contentDocument; if (!d || !d.documentElement) return;
+  const t = S.settings.theme, dark = t === 'dark' || (t !== 'light' && matchMedia('(prefers-color-scheme: dark)').matches);
+  d.documentElement.dataset.cm = dark ? 'dark' : 'light'; $('#finWrap').style.background = dark ? '#0b0b10' : '#FFFCF4';
+}
+try { matchMedia('(prefers-color-scheme: dark)').addEventListener('change', finTheme); } catch(e) {}
 function applyTheme(){
+  setTimeout(finTheme, 0);
   const t = S.settings.theme, r = document.documentElement;
   if (t === 'light' || t === 'dark') r.dataset.theme = t; else delete r.dataset.theme;
 }
@@ -1902,7 +1909,30 @@ loadPhotos().then(() => { if (PH.length) safeRender(); });
   const y0 = window.scrollY;
   fr.addEventListener('load', () => {
     window.scrollTo(0, y0);                    // the calendar centers today's day on load; don't let that move this page
-    fit(); try { new ResizeObserver(fit).observe(fr.contentDocument.body); } catch(e) {}
+    const d = fr.contentDocument; if (!d) return;
+    /* light version of the calendar (only colors; dark stays exactly as made) */
+    const css = d.createElement('style');
+    css.textContent = `:root[data-cm="light"]{color-scheme:light;--bg:#FFFCF4;--card:#F5ECDA;--card2:#ECE2CD;--line:#E2D5BC;--ink:#2F1E1B;--mut:#6B5547;
+      --b:#C2255C;--p:#1971C2;--c:#D9480F;--w:#7048E8;--o:#6B7280}
+      :root[data-cm="light"] .d.ex,:root[data-cm="light"] .d.ex b{color:var(--bg)}
+      :root[data-cm="light"] .tasks input:checked::after{border-color:var(--bg)}`;
+    d.head.appendChild(css); finTheme();
+    /* one day open at a time: tap a day (strip or card) → it opens, the others close, the page scrolls to it */
+    const days = [...d.querySelectorAll('.day')];
+    const only = el => days.forEach(x => { if (x !== el) { x.classList.remove('open'); const h = x.querySelector('.hd'); if (h) h.setAttribute('aria-expanded', 'false'); } });
+    const goTo = el => window.scrollTo({top: fr.getBoundingClientRect().top + window.scrollY + el.offsetTop - 10, behavior: 'smooth'});
+    d.addEventListener('click', e => {
+      const b = e.target.closest('.d'); if (!b) return;
+      e.stopPropagation();                     // replaces the calendar's own strip tap (it can't scroll this page on iPhone)
+      const el = d.getElementById('day-' + b.dataset.i); if (!el) return;
+      only(el); el.classList.add('open'); const h = el.querySelector('.hd'); if (h) h.setAttribute('aria-expanded', 'true');
+      requestAnimationFrame(() => { fit(); goTo(el); });
+    }, true);
+    d.addEventListener('click', e => {
+      const h = e.target.closest('.hd'); if (!h) return; const el = h.parentElement;
+      if (el.classList.contains('open')) { only(el); requestAnimationFrame(() => { fit(); goTo(el); }); }
+    });
+    fit(); try { new ResizeObserver(fit).observe(d.body); } catch(e) {}
     setTimeout(fit, 300);
   });
   wrap.appendChild(fr);
