@@ -347,8 +347,8 @@ details.help ol{padding-left:20px;margin:8px 0 0}
     <button class="iconbtn" data-a="settings" aria-label="Ajustes">⚙️</button>
   </div></header>
   <main id="view"></main>
-  <div id="finWrap"></div>
   <div id="viewB"></div>
+  <div id="finWrap"></div>
 </div>
 <nav><div class="in">
   <button data-a="nav" data-v="home"><span class="e">☀️</span>Começar</button>
@@ -1069,7 +1069,7 @@ function vHome(){
 
   return html;
 }
-/* the folds under the finals calendar (home only) */
+/* the folds above the finals calendar (home only) */
 function vHomeB(){
   const st = S.settings, tev = todayEvents(), dls = deadlines(14);
   return fold('cal', '🗓️ Hoje no calendário', st.calUrl ? `${tev.length} evento${tev.length===1?'':'s'}` : 'conectar', vTimeline())
