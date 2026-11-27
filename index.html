@@ -1922,7 +1922,7 @@ loadPhotos().then(() => { if (PH.length) safeRender(); });
       .day[hidden]{display:none!important}
       .d.sel:not(.today){outline:2px solid var(--mut);outline-offset:2px}`;
     d.head.appendChild(css); finTheme();
-    /* only the chosen day's card shows (today at first), closed; "abrir" opens it; tapping another day in the strip swaps the card */
+    /* only the chosen day's card shows (today at first), closed; "abrir" opens it; tapping another day swaps the card; tapping the same day again hides it */
     const days = [...d.querySelectorAll('.day')], strip = d.getElementById('strip');
     const show = i => {
       days.forEach((x, j) => { x.hidden = j !== i; x.classList.remove('open'); const h = x.querySelector('.hd'); if (h) h.setAttribute('aria-expanded', 'false'); });
@@ -1932,7 +1932,7 @@ loadPhotos().then(() => { if (PH.length) safeRender(); });
     d.addEventListener('click', e => {
       const b = e.target.closest('.d'); if (!b) return;
       e.stopPropagation();                     // replaces the calendar's own strip tap
-      show(+b.dataset.i);
+      const i = +b.dataset.i; show(i === ui.finSel ? -1 : i);   // tap again on the same day → hides its card
     }, true);
     /* the calendar redraws the strip when a box is ticked: keep the chosen day marked */
     if (strip) new MutationObserver(() => [...strip.children].forEach((x, j) => x.classList.toggle('sel', j === ui.finSel))).observe(strip, {childList: true});
