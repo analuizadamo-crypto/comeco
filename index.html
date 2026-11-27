@@ -1918,23 +1918,26 @@ loadPhotos().then(() => { if (PH.length) safeRender(); });
       :root[data-cm="dark"]{color-scheme:dark;--bg:#1E140E;--card:#2A1C13;--card2:#38281C;--line:#38281C;--ink:#F6E8D3;--mut:#C4AA8E}
       .d.ex,.d.ex b{color:var(--bg)!important}
       .tasks input:checked::after{border-color:var(--bg)!important}
-      .rule{display:none!important}`;
+      .rule{display:none!important}
+      .day[hidden]{display:none!important}
+      .d.sel:not(.today){outline:2px solid var(--mut);outline-offset:2px}`;
     d.head.appendChild(css); finTheme();
-    /* one day open at a time: tap a day (strip or card) → it opens, the others close, the page scrolls to it */
-    const days = [...d.querySelectorAll('.day')];
-    const only = el => days.forEach(x => { if (x !== el) { x.classList.remove('open'); const h = x.querySelector('.hd'); if (h) h.setAttribute('aria-expanded', 'false'); } });
-    const goTo = el => window.scrollTo({top: fr.getBoundingClientRect().top + window.scrollY + el.offsetTop - 10, behavior: 'smooth'});
+    /* only the chosen day's card shows (today at first), closed; "abrir" opens it; tapping another day in the strip swaps the card */
+    const days = [...d.querySelectorAll('.day')], strip = d.getElementById('strip');
+    const show = i => {
+      days.forEach((x, j) => { x.hidden = j !== i; x.classList.remove('open'); const h = x.querySelector('.hd'); if (h) h.setAttribute('aria-expanded', 'false'); });
+      ui.finSel = i; if (strip) [...strip.children].forEach((x, j) => x.classList.toggle('sel', j === i));
+      requestAnimationFrame(fit);
+    };
     d.addEventListener('click', e => {
       const b = e.target.closest('.d'); if (!b) return;
-      e.stopPropagation();                     // replaces the calendar's own strip tap (it can't scroll this page on iPhone)
-      const el = d.getElementById('day-' + b.dataset.i); if (!el) return;
-      only(el); el.classList.add('open'); const h = el.querySelector('.hd'); if (h) h.setAttribute('aria-expanded', 'true');
-      requestAnimationFrame(() => { fit(); goTo(el); });
+      e.stopPropagation();                     // replaces the calendar's own strip tap
+      show(+b.dataset.i);
     }, true);
-    d.addEventListener('click', e => {
-      const h = e.target.closest('.hd'); if (!h) return; const el = h.parentElement;
-      if (el.classList.contains('open')) { only(el); requestAnimationFrame(() => { fit(); goTo(el); }); }
-    });
+    /* the calendar redraws the strip when a box is ticked: keep the chosen day marked */
+    if (strip) new MutationObserver(() => [...strip.children].forEach((x, j) => x.classList.toggle('sel', j === ui.finSel))).observe(strip, {childList: true});
+    const t = strip && strip.querySelector('.d.today');
+    show(ui.finSel != null ? ui.finSel : t ? +t.dataset.i : 0);
     fit(); try { new ResizeObserver(fit).observe(d.body); } catch(e) {}
     setTimeout(fit, 300);
   });
