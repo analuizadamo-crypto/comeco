@@ -1477,7 +1477,7 @@ function safeRender(){
 function finTheme(){
   const fr = $('#finWrap iframe'), d = fr && fr.contentDocument; if (!d || !d.documentElement) return;
   const t = S.settings.theme, dark = t === 'dark' || (t !== 'light' && matchMedia('(prefers-color-scheme: dark)').matches);
-  d.documentElement.dataset.cm = dark ? 'dark' : 'light'; $('#finWrap').style.background = dark ? '#0b0b10' : '#FFFCF4';
+  d.documentElement.dataset.cm = dark ? 'dark' : 'light'; $('#finWrap').style.background = dark ? '#1E140E' : '#FFFCF4';
 }
 try { matchMedia('(prefers-color-scheme: dark)').addEventListener('change', finTheme); } catch(e) {}
 function applyTheme(){
@@ -1912,10 +1912,13 @@ loadPhotos().then(() => { if (PH.length) safeRender(); });
     const d = fr.contentDocument; if (!d) return;
     /* light version of the calendar (only colors; dark stays exactly as made) */
     const css = d.createElement('style');
-    css.textContent = `:root[data-cm="light"]{color-scheme:light;--bg:#FFFCF4;--card:#F5ECDA;--card2:#ECE2CD;--line:#E2D5BC;--ink:#2F1E1B;--mut:#6B5547;
-      --b:#C2255C;--p:#1971C2;--c:#D9480F;--w:#7048E8;--o:#6B7280}
-      :root[data-cm="light"] .d.ex,:root[data-cm="light"] .d.ex b{color:var(--bg)}
-      :root[data-cm="light"] .tasks input:checked::after{border-color:var(--bg)}`;
+    css.textContent = `/* the app's palette, light and dark; the calendar's own content stays as made */
+      :root[data-cm="light"]{color-scheme:light;--bg:#FFFCF4;--card:#F5ECDA;--card2:#ECE2CD;--line:#E2D5BC;--ink:#2F1E1B;--mut:#6B5547;
+        --b:#C2255C;--p:#1971C2;--c:#D9480F;--w:#7048E8;--o:#6B7280}
+      :root[data-cm="dark"]{color-scheme:dark;--bg:#1E140E;--card:#2A1C13;--card2:#38281C;--line:#38281C;--ink:#F6E8D3;--mut:#C4AA8E}
+      .d.ex,.d.ex b{color:var(--bg)!important}
+      .tasks input:checked::after{border-color:var(--bg)!important}
+      .rule{display:none!important}`;
     d.head.appendChild(css); finTheme();
     /* one day open at a time: tap a day (strip or card) → it opens, the others close, the page scrolls to it */
     const days = [...d.querySelectorAll('.day')];
